@@ -111,7 +111,7 @@ function onUploadGLTF(resolve) {
   })
 }
 
-;(function onLongTouchUploadGLTF() {
+; (function onLongTouchUploadGLTF() {
   const element = document.body
   const fileInput = document.querySelector('input[type=file]')
   let longPressTimer = null
@@ -163,7 +163,7 @@ function getSearchParams() {
   const { href } = location
   const { searchParams } = new URL(href)
   const isDebug = searchParams.getAll('debug').length
-  let [backgroundColorStr, backgroundOpacityStr] = searchParams.get('bgColor')?.split(/[,，]/)
+  let [backgroundColorStr, backgroundOpacityStr] = searchParams.get('bgColor')?.split(/[,，]/) || []
   if (backgroundColorStr?.length === 3) {
     backgroundColorStr = backgroundColorStr.split('').map(e => e.repeat(2)).join('')
   }
