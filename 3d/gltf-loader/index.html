@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>GLTF Loader</title>
+	<style>
+		html,
+		body {
+			margin: 0;
+		}
+
+		canvas {
+			width: 100vw;
+			height: 100vh;
+		}
+
+		form {
+			position: absolute;
+			top: 0;
+		}
+	</style>
+</head>
+
+<body>
+	<form><input type="file" multiple accept=".gltf,.glb" placeholder="导入GLTF模型" /></form>
+</body>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://threejs.org/build/three.module.js",
+    "three/addons/": "https://threejs.org/examples/jsm/"
+  }
+}
+</script>
+<script type="module" src="./index.js"></script>
+
+</html>
