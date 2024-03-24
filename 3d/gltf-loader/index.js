@@ -1,5 +1,4 @@
 import * as THREE from 'three'
-import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 
@@ -41,14 +40,19 @@ const rafDebounce = (cb) => {
   }
 }
 
-function main({ isDebug, backgroundColor } = {}) {
+function main({ isDebug, backgroundColor, backgroundOpacity, autoRotateSpeed } = {}) {
   const scene = new THREE.Scene()
   const camera = new THREE.PerspectiveCamera(75, 2, 0.1, 10000)
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
-  typeof backgroundColor == 'number' && renderer.setClearColor(backgroundColor, 1.0)
+  typeof backgroundColor == 'number' && renderer.setClearColor(backgroundColor, backgroundOpacity)
   const canvas = renderer.domElement
+
   document.body.appendChild(canvas)
   const controls = new OrbitControls(camera, canvas)
+  if (autoRotateSpeed) {
+    controls.autoRotate = true
+    controls.autoRotateSpeed = autoRotateSpeed
+  }
 
   // 创建光照，例如环境光
   const ambientLight = new THREE.AmbientLight(0xffffff) // soft white light
@@ -64,12 +68,13 @@ function main({ isDebug, backgroundColor } = {}) {
 
   let gltf
   return async function loadGLTF(url) {
-    if (gltf) {
-      scene.remove(gltf.scene)
-    }
     const loader = new GLTFLoader()
     try {
-      gltf = await loader.loadAsync(url)
+      const newGltf = await loader.loadAsync(url)
+      if (gltf) {
+        scene.remove(gltf.scene)
+      }
+      gltf = newGltf
       const model = gltf.scene
       scene.add(model)
       model.updateMatrixWorld()
@@ -102,24 +107,88 @@ function onUploadGLTF(resolve) {
   const fileInput = document.querySelector('input[type=file]')
   fileInput.addEventListener('change', ({ target }) => {
     const { files } = target
-    if (!files?.length) return
+    readGLTFFile(files[0]).then(resolve)
+  })
+}
+
+;(function onLongTouchUploadGLTF() {
+  const element = document.body
+  const fileInput = document.querySelector('input[type=file]')
+  let longPressTimer = null
+  element.addEventListener('touchstart', function (event) {
+    longPressTimer = setTimeout(() => {
+      fileInput.click()
+    }, 1000)
+  })
+  element.addEventListener('touchend', function (event) {
+    if (longPressTimer) {
+      clearTimeout(longPressTimer)
+      longPressTimer = null
+    }
+  })
+  element.addEventListener('touchcancel', function (event) {
+    clearTimeout(longPressTimer)
+  })
+})()
+
+function onDragDropGLTF(resolve) {
+  const dropArea = document.body
+  // 监听dragover事件，设置为可接收数据
+  dropArea.addEventListener('dragover', function (e) {
+    e.preventDefault()
+    this.classList.add('hover')
+  }, false)
+  // 监听drop事件，处理文件
+  dropArea.addEventListener('drop', function (e) {
+    e.preventDefault()
+    dropArea.classList.remove('hover')
+    const file = e.dataTransfer.files?.[0] // 获取文件列表
+    readGLTFFile(file).then(resolve)
+  }, false)
+}
+
+function readGLTFFile(file) {
+  return new Promise((resolve, reject) => {
+    if (!file || !/.*\.gl(b|tf)$/.test(file.name)) reject('Not gltf')
     const reader = new FileReader()
     reader.onloadend = () => {
       resolve(reader.result)
     }
-    reader.onerror = console.error
-    reader.readAsDataURL(files[0])
+    reader.onerror = reject
+    reader.readAsDataURL(file)
   })
 }
 
-const { href } = location
-const { searchParams } = new URL(href)
-const isDebug = searchParams.getAll('debug').length
-let backgroundColor = parseInt(searchParams.get('bgColor'), 16)
-backgroundColor = !Number.isNaN(backgroundColor) && backgroundColor
-console.log(backgroundColor)
-const loadGLTF = main({ isDebug, backgroundColor })
-loadGLTF('https://threejs.org/examples/models/gltf/RobotExpressive/RobotExpressive.glb')
-onUploadGLTF((e) => {
-  loadGLTF(e)
-})
+function getSearchParams() {
+  const { href } = location
+  const { searchParams } = new URL(href)
+  const isDebug = searchParams.getAll('debug').length
+  let [backgroundColorStr, backgroundOpacityStr] = searchParams.get('bgColor')?.split(/[,，]/)
+  if (backgroundColorStr?.length === 3) {
+    backgroundColorStr = backgroundColorStr.split('').map(e => e.repeat(2)).join('')
+  }
+  let backgroundColor
+  if (backgroundColorStr?.length === 6) {
+    backgroundColor = parseInt(backgroundColorStr, 16)
+    if (Number.isNaN(backgroundColor)) {
+      backgroundColor = undefined
+    }
+  }
+  let backgroundOpacity = parseFloat(backgroundOpacityStr)
+  if (Number.isNaN(backgroundOpacity)) {
+    backgroundOpacity = undefined
+  }
+  const model = searchParams.get('model')
+  const autoRotateSpeedStr = searchParams.get('autoRotateSpeed')
+  let autoRotateSpeed = parseFloat(autoRotateSpeedStr)
+  if (Number.isNaN(backgroundOpacity)) {
+    autoRotateSpeed = undefined
+  }
+  return { isDebug, backgroundColor, backgroundOpacity, model, autoRotateSpeed }
+}
+
+const { model, ...args } = getSearchParams()
+const loadGLTF = main(args)
+loadGLTF(model ?? 'https://threejs.org/examples/models/gltf/RobotExpressive/RobotExpressive.glb')
+onUploadGLTF(loadGLTF)
+onDragDropGLTF(loadGLTF)
