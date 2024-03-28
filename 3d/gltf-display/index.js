@@ -82,7 +82,7 @@ function initViewer({ isDebug, backgroundColor, backgroundOpacity, autoRotateSpe
       gltf = newGltf
       const model = gltf.scene
       scene.add(model)
-      model.updateMatrixWorld()
+      model.updateMatrixWorld() // important! 更新模型的世界矩阵
       const box = new THREE.Box3().setFromObject(model)
 
       const center = box.getCenter(new THREE.Vector3())
@@ -94,8 +94,8 @@ function initViewer({ isDebug, backgroundColor, backgroundOpacity, autoRotateSpe
       camera.position.x += size / 2.0
       camera.position.y += size / 5.0
       camera.position.z += size / 2.0
+      camera.updateProjectionMatrix() // important! 更新相机的投影矩阵
       controls.target = center
-
       if (isDebug) {
         const boxHelper = new THREE.BoxHelper(model, 0x00ff00)
         boxHelper.update()
@@ -181,6 +181,26 @@ function onDragDropGLTF(onLoad, onError) {
   }, false)
 }
 
+; (function onLongTouchUploadGLTF() {
+  const element = document.body
+  const fileInput = document.querySelector('input[type=file]')
+  let longPressTimer = null
+  element.addEventListener('touchstart', function (event) {
+    longPressTimer = setTimeout(() => {
+      fileInput.click()
+    }, 1000)
+  })
+  element.addEventListener('touchend', function (event) {
+    if (longPressTimer) {
+      clearTimeout(longPressTimer)
+      longPressTimer = null
+    }
+  })
+  element.addEventListener('touchcancel', function (event) {
+    clearTimeout(longPressTimer)
+  })
+})()
+
 function getSearchParams() {
   const { href } = location
   const { searchParams } = new URL(href)
@@ -208,27 +228,6 @@ function getSearchParams() {
   }
   return { isDebug, backgroundColor, backgroundOpacity, model, autoRotateSpeed }
 }
-
-
-; (function onLongTouchUploadGLTF() {
-  const element = document.body
-  const fileInput = document.querySelector('input[type=file]')
-  let longPressTimer = null
-  element.addEventListener('touchstart', function (event) {
-    longPressTimer = setTimeout(() => {
-      fileInput.click()
-    }, 1000)
-  })
-  element.addEventListener('touchend', function (event) {
-    if (longPressTimer) {
-      clearTimeout(longPressTimer)
-      longPressTimer = null
-    }
-  })
-  element.addEventListener('touchcancel', function (event) {
-    clearTimeout(longPressTimer)
-  })
-})()
 
 const { model, ...args } = getSearchParams()
 const loadGLTF = initViewer(args)
