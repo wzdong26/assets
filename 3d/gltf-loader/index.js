@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
+import { parseDataTransferItems } from './readFiles.js'
 
 /**
  * 更新 renderer size 和 cameras aspect
@@ -40,7 +41,7 @@ const rafDebounce = (cb) => {
   }
 }
 
-function main({ isDebug, backgroundColor, backgroundOpacity, autoRotateSpeed } = {}) {
+function initViewer({ isDebug, backgroundColor, backgroundOpacity, autoRotateSpeed } = {}) {
   const scene = new THREE.Scene()
   const camera = new THREE.PerspectiveCamera(75, 2, 0.1, 10000)
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
@@ -67,10 +68,14 @@ function main({ isDebug, backgroundColor, backgroundOpacity, autoRotateSpeed } =
   window.addEventListener('resize', render)
 
   let gltf
-  return async function loadGLTF(url) {
-    const loader = new GLTFLoader()
+  /**
+   * @param {string} url
+   * @param {Record<string, Blob>} blobs
+   */
+  return async function loadGLTF(url, blobs) {
+    const loader = gltfLoader()
     try {
-      const newGltf = await loader.loadAsync(url)
+      const newGltf = await loader.load(url, blobs)
       if (gltf) {
         scene.remove(gltf.scene)
       }
@@ -103,53 +108,76 @@ function main({ isDebug, backgroundColor, backgroundOpacity, autoRotateSpeed } =
   }
 }
 
-function onUploadGLTF(resolve) {
-  const fileInput = document.querySelector('input[type=file]')
-  fileInput.addEventListener('change', ({ target }) => {
-    const { files } = target
-    readGLTFFile(files[0]).then(resolve)
+function gltfLoader() {
+  const manager = new THREE.LoadingManager()
+  return Object.assign(manager, {
+    /**
+     * @param {string} gltfUrl 
+     * @param {Record<string, Blob>} blobs 
+     * @returns 
+     */
+    async load(gltfUrl, blobs) {
+      const [, basePath, gltfName] = /(.*[\/\\])(.*)/.exec(gltfUrl) || []
+      const objectURLs = []
+      manager.setURLModifier((url) => {
+        // const normalizedURL = basePath + decodeURI(url).replace(baseURL, '').replace(/^(\.?\/)/, '')
+        const blob = blobs?.[url]
+        if (blob) {
+          url = URL.createObjectURL(blob)
+          objectURLs.push(url)
+        }
+        return url
+      })
+      const loader = new GLTFLoader(manager)
+      const gltf = await loader.loadAsync(gltfUrl)
+      objectURLs.forEach((url) => URL.revokeObjectURL(url))
+      return gltf
+    }
   })
 }
 
-; (function onLongTouchUploadGLTF() {
-  const element = document.body
+function onUploadGLTF(onLoad, onError) {
   const fileInput = document.querySelector('input[type=file]')
-  let longPressTimer = null
-  element.addEventListener('touchstart', function (event) {
-    longPressTimer = setTimeout(() => {
-      fileInput.click()
-    }, 1000)
+  fileInput.addEventListener('change', ({ target }) => {
+    const { files } = target
+    readGLTFFile(files[0]).then(onLoad, onError)
   })
-  element.addEventListener('touchend', function (event) {
-    if (longPressTimer) {
-      clearTimeout(longPressTimer)
-      longPressTimer = null
-    }
-  })
-  element.addEventListener('touchcancel', function (event) {
-    clearTimeout(longPressTimer)
-  })
-})()
+}
 
-function onDragDropGLTF(resolve) {
+function onDragDropGLTF(onLoad, onError) {
   const dropArea = document.body
-  // 监听dragover事件，设置为可接收数据
-  dropArea.addEventListener('dragover', function (e) {
-    e.preventDefault()
-    this.classList.add('hover')
-  }, false)
-  // 监听drop事件，处理文件
-  dropArea.addEventListener('drop', function (e) {
-    e.preventDefault()
-    dropArea.classList.remove('hover')
-    const file = e.dataTransfer.files?.[0] // 获取文件列表
-    readGLTFFile(file).then(resolve)
+  dropArea.addEventListener('dragenter', () => dropArea.classList.add('hover'))
+  dropArea.addEventListener('dragover', (evt) => evt.preventDefault())
+    ;['dragleave', 'drop'].forEach(e => {
+      dropArea.addEventListener(e, (evt) => {
+        evt.preventDefault()
+        if (evt.target === dropArea) {
+          dropArea.classList.remove('hover')
+        }
+      })
+    })
+  dropArea.addEventListener('drop', async ({ dataTransfer }) => {
+    const { items } = dataTransfer || {} // 获取文件列表
+    const files = await Promise.all(await parseDataTransferItems(items))
+    const blobs = {}
+    let gltfFile
+    files.forEach(({ file, fullPath }) => {
+      blobs[fullPath] = file
+      if (fullPath.match(/\.gl(b|tf)$/)) {
+        gltfFile = fullPath
+      }
+    })
+    if (gltfFile) {
+      onLoad?.(gltfFile, blobs)
+    } else {
+      onError?.('Not gltf')
+    }
   }, false)
 }
 
 function readGLTFFile(file) {
   return new Promise((resolve, reject) => {
-    if (!file || !/.*\.gl(b|tf)$/.test(file.name)) reject('Not gltf')
+    if (!file || !/\.gl(b|tf)$/.test(file.name)) reject('Not gltf')
     const reader = new FileReader()
     reader.onloadend = () => {
       resolve(reader.result)
@@ -187,8 +215,29 @@ function getSearchParams() {
   return { isDebug, backgroundColor, backgroundOpacity, model, autoRotateSpeed }
 }
 
+
+; (function onLongTouchUploadGLTF() {
+  const element = document.body
+  const fileInput = document.querySelector('input[type=file]')
+  let longPressTimer = null
+  element.addEventListener('touchstart', function (event) {
+    longPressTimer = setTimeout(() => {
+      fileInput.click()
+    }, 1000)
+  })
+  element.addEventListener('touchend', function (event) {
+    if (longPressTimer) {
+      clearTimeout(longPressTimer)
+      longPressTimer = null
+    }
+  })
+  element.addEventListener('touchcancel', function (event) {
+    clearTimeout(longPressTimer)
+  })
+})()
+
 const { model, ...args } = getSearchParams()
-const loadGLTF = main(args)
+const loadGLTF = initViewer(args)
 loadGLTF(model ?? 'https://threejs.org/examples/models/gltf/RobotExpressive/RobotExpressive.glb')
-onUploadGLTF(loadGLTF)
-onDragDropGLTF(loadGLTF)
+onUploadGLTF(loadGLTF, console.error)
+onDragDropGLTF(loadGLTF, console.error)
