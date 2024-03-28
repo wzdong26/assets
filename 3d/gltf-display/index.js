@@ -231,6 +231,10 @@ function getSearchParams() {
 
 const { model, ...args } = getSearchParams()
 const loadGLTF = initViewer(args)
-loadGLTF(model ?? 'https://threejs.org/examples/models/gltf/RobotExpressive/RobotExpressive.glb')
+if (model) {
+  loadGLTF(model)
+} else {
+  document.body.classList.add('hover')
+}
 onUploadGLTF(loadGLTF, console.error)
 onDragDropGLTF(loadGLTF, console.error)
