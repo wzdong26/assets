@@ -124,8 +124,8 @@ function gltfLoader() {
         const blob = blobs?.[url]
         if (blob) {
           url = URL.createObjectURL(blob)
-          objectURLs.push(url)
         }
+        objectURLs.push(url)
         return url
       })
       const loader = new GLTFLoader(manager)
@@ -140,7 +140,13 @@ function onUploadGLTF(onLoad, onError) {
   const fileInput = document.querySelector('input[type=file]')
   fileInput.addEventListener('change', ({ target }) => {
     const { files } = target
-    readGLTFFile(files[0]).then(onLoad, onError)
+    for (const file of files) {
+      if (file.name.match(/\.gl(b|tf)$/)) {
+        onLoad?.(file.name, { [file.name]: file })
+        return
+      }
+    }
+    onError?.('Not gltf')
   })
 }
 
@@ -173,18 +179,6 @@ function onDragDropGLTF(onLoad, onError) {
       onError?.('Not gltf')
     }
   }, false)
-}
-
-function readGLTFFile(file) {
-  return new Promise((resolve, reject) => {
-    if (!file || !/\.gl(b|tf)$/.test(file.name)) reject('Not gltf')
-    const reader = new FileReader()
-    reader.onloadend = () => {
-      resolve(reader.result)
-    }
-    reader.onerror = reject
-    reader.readAsDataURL(file)
-  })
 }
 
 function getSearchParams() {
