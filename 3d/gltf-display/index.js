@@ -41,7 +41,7 @@ const rafDebounce = (cb) => {
   }
 }
 
-function initViewer({ isDebug, backgroundColor, backgroundOpacity, autoRotateSpeed } = {}) {
+function initViewer({ isDebug, backgroundColor, backgroundOpacity, autoRotateSpeed, z } = {}) {
   const scene = new THREE.Scene()
   const camera = new THREE.PerspectiveCamera(75, 2, 0.1, 10000)
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
@@ -88,12 +88,13 @@ function initViewer({ isDebug, backgroundColor, backgroundOpacity, autoRotateSpe
       const center = box.getCenter(new THREE.Vector3())
       const size = box.getSize(new THREE.Vector3()).length()
       controls.maxDistance = size * 10
+      controls.minDistance = size / 100
       camera.near = size / 100
       camera.far = size * 100
       camera.position.copy(center)
-      camera.position.x += size / 2.0
+      camera.position.x += size / (z ?? 2.0)
       camera.position.y += size / 5.0
-      camera.position.z += size / 2.0
+      camera.position.z += size / (z ?? 2.0)
       camera.updateProjectionMatrix() // important! 更新相机的投影矩阵
       controls.target = center
       if (isDebug) {
@@ -110,6 +111,12 @@ function initViewer({ isDebug, backgroundColor, backgroundOpacity, autoRotateSpe
 
 function gltfLoader() {
   const manager = new THREE.LoadingManager()
+  manager.onStart = () => {
+    setLoading?.(true)
+  }
+  manager.onLoad = () => {
+    setLoading?.(false)
+  }
   return Object.assign(manager, {
     /**
      * @param {string} gltfUrl 
@@ -152,7 +159,10 @@ function onUploadGLTF(onLoad, onError) {
 
 function onDragDropGLTF(onLoad, onError) {
   const dropArea = document.body
-  dropArea.addEventListener('dragenter', () => dropArea.classList.add('hover'))
+  dropArea.addEventListener('dragenter', () => {
+    document.body.setAttribute('data-content-hover', '拖拽glTF文件放置此处（支持.gltf/.glb）')
+    dropArea.classList.add('hover')
+  })
   dropArea.addEventListener('dragover', (evt) => evt.preventDefault())
     ;['dragleave', 'drop'].forEach(e => {
       dropArea.addEventListener(e, (evt) => {
@@ -181,26 +191,6 @@ function onDragDropGLTF(onLoad, onError) {
   }, false)
 }
 
-; (function onLongTouchUploadGLTF() {
-  const element = document.body
-  const fileInput = document.querySelector('input[type=file]')
-  let longPressTimer = null
-  element.addEventListener('touchstart', function (event) {
-    longPressTimer = setTimeout(() => {
-      fileInput.click()
-    }, 1000)
-  })
-  element.addEventListener('touchend', function (event) {
-    if (longPressTimer) {
-      clearTimeout(longPressTimer)
-      longPressTimer = null
-    }
-  })
-  element.addEventListener('touchcancel', function (event) {
-    clearTimeout(longPressTimer)
-  })
-})()
-
 function getSearchParams() {
   const { href } = location
   const { searchParams } = new URL(href)
@@ -226,15 +216,50 @@ function getSearchParams() {
   if (Number.isNaN(backgroundOpacity)) {
     autoRotateSpeed = undefined
   }
-  return { isDebug, backgroundColor, backgroundOpacity, model, autoRotateSpeed }
+  const zStr = searchParams.get('z')
+  let z = parseFloat(zStr)
+  if (Number.isNaN(z)) {
+    z = undefined
+  }
+  return { isDebug, backgroundColor, backgroundOpacity, model, autoRotateSpeed, z }
+}
+
+function createIframeLoading() {
+  const iframeT = document.createElement('iframe')
+  iframeT.src = './?model=./loading/scene.gltf&autoRotateSpeed=25&bgColor=e0dfdf,0.8&z=0.4'
+  iframeT.className = 'loading'
+  iframeT.hidden = true
+  document.body.appendChild(iframeT)
+  return function setLoading(flag) {
+    iframeT.hidden = !flag
+  }
 }
 
 const { model, ...args } = getSearchParams()
 const loadGLTF = initViewer(args)
-if (model) {
-  loadGLTF(model)
-} else {
-  document.body.classList.add('hover')
-}
-onUploadGLTF(loadGLTF, console.error)
+
+let setLoading
+  ; (function init() {
+    if (model) {
+      if (model != './loading/scene.gltf') {
+        setLoading = createIframeLoading()
+      }
+      loadGLTF(model)
+    } else {
+      document.body.setAttribute('data-content-hover', '点击上传glTF')
+      document.body.classList.add('hover')
+      const fileInput = document.querySelector('input[type=file]')
+      document.addEventListener('click', ({ target }) => {
+        if (target === document.body) {
+          fileInput.click()
+        }
+      })
+    }
+  })()
+
+onUploadGLTF((...args) =>
+  loadGLTF(...args).finally(() => {
+    document.body.classList.remove('hover')
+  })
+  , console.error)
 onDragDropGLTF(loadGLTF, console.error)
