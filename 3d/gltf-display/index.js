@@ -41,7 +41,7 @@ const rafDebounce = (cb) => {
   }
 }
 
-function initViewer({ isDebug, backgroundColor, backgroundOpacity, autoRotateSpeed, z } = {}) {
+function initViewer({ debug, backgroundColor, backgroundOpacity, autoRotateSpeed, z, control = false } = {}) {
   const scene = new THREE.Scene()
   const camera = new THREE.PerspectiveCamera(75, 2, 0.1, 10000)
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
@@ -50,6 +50,7 @@ function initViewer({ isDebug, backgroundColor, backgroundOpacity, autoRotateSpe
 
   document.body.appendChild(canvas)
   const controls = new OrbitControls(camera, canvas)
+  controls.enabled = control
   if (autoRotateSpeed) {
     controls.autoRotate = true
     controls.autoRotateSpeed = autoRotateSpeed
@@ -97,14 +98,14 @@ function initViewer({ isDebug, backgroundColor, backgroundOpacity, autoRotateSpe
       camera.position.z += size / (z ?? 2.0)
       camera.updateProjectionMatrix() // important! 更新相机的投影矩阵
       controls.target = center
-      if (isDebug) {
+      if (debug) {
         const boxHelper = new THREE.BoxHelper(model, 0x00ff00)
         boxHelper.update()
         scene.add(boxHelper)
       }
       render()
     } catch (e) {
-      console.error('Load GLTF error:', e)
+      console.error('Load glTF error:', e)
     }
   }
 }
@@ -194,10 +195,23 @@ function onDragDropGLTF(onLoad, onError) {
 function getSearchParams() {
   const { href } = location
   const { searchParams } = new URL(href)
-  const isDebug = searchParams.getAll('debug').length
+  const searchP = {}
+  const mustBeNumberKeys = ['autoRotateSpeed', 'z']
+  searchParams.entries().forEach(([k, v]) => {
+    if (v === '') {
+      searchP[k] = true
+      return
+    }
+    if (!Number.isNaN(+v)) {
+      v = +v
+    } else if (mustBeNumberKeys.includes(k)) {
+      v = undefined
+    }
+    searchP[k] = v
+  })
   let [backgroundColorStr, backgroundOpacityStr] = searchParams.get('bgColor')?.split(/[,，]/) || []
   if (backgroundColorStr?.length === 3) {
-    backgroundColorStr = backgroundColorStr.split('').map(e => e.repeat(2)).join('')
+    backgroundColorStr = [...backgroundColorStr].map(e => e.repeat(2)).join('')
   }
   let backgroundColor
   if (backgroundColorStr?.length === 6) {
@@ -206,27 +220,19 @@ function getSearchParams() {
       backgroundColor = undefined
     }
   }
-  let backgroundOpacity = parseFloat(backgroundOpacityStr)
-  if (Number.isNaN(backgroundOpacity)) {
+  let backgroundOpacity = +backgroundOpacityStr
+  if (Number.isNaN(backgroundOpacity) || backgroundOpacity > 1 || backgroundOpacity < 0) {
     backgroundOpacity = undefined
   }
-  const model = searchParams.get('model')
-  const autoRotateSpeedStr = searchParams.get('autoRotateSpeed')
-  let autoRotateSpeed = parseFloat(autoRotateSpeedStr)
-  if (Number.isNaN(backgroundOpacity)) {
-    autoRotateSpeed = undefined
-  }
-  const zStr = searchParams.get('z')
-  let z = parseFloat(zStr)
-  if (Number.isNaN(z)) {
-    z = undefined
-  }
-  return { isDebug, backgroundColor, backgroundOpacity, model, autoRotateSpeed, z }
+
+  // { debug, backgroundColor, backgroundOpacity, model, autoRotateSpeed, z }
+  console.log(searchP)
+  return { ...searchP, backgroundColor, backgroundOpacity }
 }
 
 function createIframeLoading() {
   const iframeT = document.createElement('iframe')
-  iframeT.src = './?model=./loading/scene.gltf&autoRotateSpeed=25&bgColor=e0dfdf,0.8&z=0.4'
+  iframeT.src = './?model=./loading/scene.gltf&autoRotateSpeed=25&bgColor=e0dfdf,0.85&z=0.4'
   iframeT.className = 'loading'
   iframeT.hidden = true
   document.body.appendChild(iframeT)
