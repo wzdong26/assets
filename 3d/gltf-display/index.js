@@ -240,10 +240,10 @@ const loadGLTF = initViewer(args)
 
 let setLoading
   ; (function init() {
+    if (model != './loading/scene.gltf') {
+      setLoading = createIframeLoading()
+    }
     if (model) {
-      if (model != './loading/scene.gltf') {
-        setLoading = createIframeLoading()
-      }
       loadGLTF(model)
     } else {
       document.body.setAttribute('data-content-hover', '点击上传glTF')
