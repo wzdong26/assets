@@ -34,7 +34,7 @@ if (!(inputBlocked && model)) {
 }
 
 // =================== THREE Viewer ===================
-function initViewer({ debug, backgroundColor, backgroundOpacity, autoRotateSpeed, z, ctrlBlocked, lightColor, lightIntensity } = {}) {
+function initViewer({ debug, backgroundColor, backgroundOpacity, autoRotateSpeed, z, ctrlBlocked, lightColor, lightIntensity, wireframe } = {}) {
   const scene = new THREE.Scene()
   const camera = new THREE.PerspectiveCamera(75, 2, 0.1, 10000)
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
@@ -74,6 +74,9 @@ function initViewer({ debug, backgroundColor, backgroundOpacity, autoRotateSpeed
     }
     gltf = newGltf
     const model = gltf.scene
+    wireframe && traverseMaterials(model, (material) => {
+      material.wireframe = true
+    })
     scene.add(model)
     model.updateMatrixWorld() // important! 更新模型的世界矩阵
     const box = new THREE.Box3().setFromObject(model)
@@ -97,6 +100,14 @@ function initViewer({ debug, backgroundColor, backgroundOpacity, autoRotateSpeed
     }
     render()
   }
+}
+
+function traverseMaterials(object, callback) {
+  object.traverse((node) => {
+    if (!node.geometry) return;
+    const materials = Array.isArray(node.material) ? node.material : [node.material];
+    materials.forEach(callback);
+  });
 }
 
 // =================== gltf load manager ===================
@@ -151,10 +162,11 @@ function getSearchParams() {
   const { href } = location
   const { searchParams } = new URL(href)
   const searchP = Object.fromEntries(searchParams.entries())
-    // searchP.inputBlocked: 只可查看model，不可input gltf
-    // searchP.ctrlBlocked: controls不可交互
-    // searchP.debug: 可查看gltf box
-    ;['inputBlocked', 'ctrlBlocked', 'debug',].forEach((e) => {
+    // inputBlocked: 只可查看model，不可input gltf
+    // ctrlBlocked: controls不可交互
+    // debug: 可查看gltf box
+    // wireframe: 可查看gltf wireframe
+    ;['inputBlocked', 'ctrlBlocked', 'debug', 'wireframe'].forEach((e) => {
       if (searchP[e] != null) {
         searchP[e] = true
       }
