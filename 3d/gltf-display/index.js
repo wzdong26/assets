@@ -3,45 +3,38 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { parseDataTransferItems } from './readFiles.js'
 
-/**
- * 更新 renderer size 和 cameras aspect
- * @param {THREE.WebGLRenderer} renderer 
- * @param  {...THREE.PerspectiveCamera} cameras 
- * @returns 是否更新
- */
-function resizeToDisplaySize(renderer, ...cameras) {
-  const canvas = renderer.domElement
-  const { width, clientWidth, height, clientHeight } = canvas
-  const needResize = clientWidth !== width || clientHeight !== height
-  if (needResize) {
-    renderer.setSize(clientWidth, clientHeight, false)
-    cameras.forEach(camera => {
-      camera.aspect = clientWidth / clientHeight
-      camera.updateProjectionMatrix()
+const { model, inputBlocked, ...args } = getSearchParams()
+const loadGLTF = initViewer(args)
+
+const setLoading = model != './loading/scene.gltf' ? createIframeLoading() : null
+
+{
+  if (model) {
+    loadGLTF(model)
+  } else {
+    document.body.setAttribute('data-content-hover', '点击上传glTF')
+    document.body.classList.add('hover')
+    const fileInput = document.querySelector('input[type=file]')
+    document.addEventListener('click', ({ target }) => {
+      if (target === document.body) {
+        fileInput.click()
+      }
     })
   }
-  return needResize
 }
 
-/**
- * requestAnimationFrame debounce: 在一个动画帧内的频繁事件仅在下一次重绘前执行一次
- * @param {(time: number) => void} cb 触发事件执行的回调
- * @returns 防抖后的回调
- */
-const rafDebounce = (cb) => {
-  let flag = false
-  return function () {
-    if (!flag) {
-      flag = true
-      requestAnimationFrame((time) => {
-        flag = false
-        cb?.(time)
-      })
-    }
-  }
+// inputBlocked==false or model==null, 可上传gltf
+if (!(inputBlocked && model)) {
+  onUploadGLTF((...args) =>
+    loadGLTF(...args).finally(() => {
+      document.body.classList.remove('hover')
+    })
+    , console.error)
+  onDragDropGLTF(loadGLTF, console.error)
 }
 
-function initViewer({ debug, backgroundColor, backgroundOpacity, autoRotateSpeed, z, control = false } = {}) {
+// =================== THREE Viewer ===================
+function initViewer({ debug, backgroundColor, backgroundOpacity, autoRotateSpeed, z, ctrlBlocked, lightColor, lightIntensity } = {}) {
   const scene = new THREE.Scene()
   const camera = new THREE.PerspectiveCamera(75, 2, 0.1, 10000)
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
@@ -50,14 +43,14 @@ function initViewer({ debug, backgroundColor, backgroundOpacity, autoRotateSpeed
 
   document.body.appendChild(canvas)
   const controls = new OrbitControls(camera, canvas)
-  controls.enabled = control
+  controls.enabled = !ctrlBlocked
   if (autoRotateSpeed) {
     controls.autoRotate = true
     controls.autoRotateSpeed = autoRotateSpeed
   }
 
   // 创建光照，例如环境光
-  const ambientLight = new THREE.AmbientLight(0xffffff) // soft white light
+  const ambientLight = new THREE.AmbientLight(lightColor, lightIntensity) // soft white light
   scene.add(ambientLight)
 
   const render = rafDebounce(() => {
@@ -75,41 +68,38 @@ function initViewer({ debug, backgroundColor, backgroundOpacity, autoRotateSpeed
    */
   return async function loadGLTF(url, blobs) {
     const loader = gltfLoader()
-    try {
-      const newGltf = await loader.load(url, blobs)
-      if (gltf) {
-        scene.remove(gltf.scene)
-      }
-      gltf = newGltf
-      const model = gltf.scene
-      scene.add(model)
-      model.updateMatrixWorld() // important! 更新模型的世界矩阵
-      const box = new THREE.Box3().setFromObject(model)
-
-      const center = box.getCenter(new THREE.Vector3())
-      const size = box.getSize(new THREE.Vector3()).length()
-      controls.maxDistance = size * 10
-      controls.minDistance = size / 100
-      camera.near = size / 100
-      camera.far = size * 100
-      camera.position.copy(center)
-      camera.position.x += size / (z ?? 2.0)
-      camera.position.y += size / 5.0
-      camera.position.z += size / (z ?? 2.0)
-      camera.updateProjectionMatrix() // important! 更新相机的投影矩阵
-      controls.target = center
-      if (debug) {
-        const boxHelper = new THREE.BoxHelper(model, 0x00ff00)
-        boxHelper.update()
-        scene.add(boxHelper)
-      }
-      render()
-    } catch (e) {
-      console.error('Load glTF error:', e)
+    const newGltf = await loader.load(url, blobs)
+    if (gltf) {
+      scene.remove(gltf.scene)
     }
+    gltf = newGltf
+    const model = gltf.scene
+    scene.add(model)
+    model.updateMatrixWorld() // important! 更新模型的世界矩阵
+    const box = new THREE.Box3().setFromObject(model)
+
+    const center = box.getCenter(new THREE.Vector3())
+    const size = box.getSize(new THREE.Vector3()).length()
+    controls.maxDistance = size * 10
+    controls.minDistance = size / 100
+    camera.near = size / 100
+    camera.far = size * 100
+    camera.position.copy(center)
+    camera.position.x += size / (z ?? 2.0)
+    camera.position.y += size / 5.0
+    camera.position.z += size / (z ?? 2.0)
+    camera.updateProjectionMatrix() // important! 更新相机的投影矩阵
+    controls.target = center
+    if (debug) {
+      const boxHelper = new THREE.BoxHelper(model, 0x00ff00)
+      boxHelper.update()
+      scene.add(boxHelper)
+    }
+    render()
   }
 }
 
+// =================== gltf load manager ===================
 function gltfLoader() {
   const manager = new THREE.LoadingManager()
   manager.onStart = () => {
@@ -144,6 +134,45 @@ function gltfLoader() {
   })
 }
 
+// =================== loading ===================
+function createIframeLoading() {
+  const iframeT = document.createElement('iframe')
+  iframeT.src = './?model=./loading/scene.gltf&autoRotateSpeed=30&bgColor=e0dfdf,0.85&z=0.35&inputBlocked&ctrlBlocked'
+  iframeT.className = 'loading'
+  iframeT.hidden = true
+  document.body.appendChild(iframeT)
+  return function setLoading(flag) {
+    iframeT.hidden = !flag
+  }
+}
+
+// =================== searchParams input ===================
+function getSearchParams() {
+  const { href } = location
+  const { searchParams } = new URL(href)
+  const searchP = Object.fromEntries(searchParams.entries())
+    // searchP.inputBlocked: 只可查看model，不可input gltf
+    // searchP.ctrlBlocked: controls不可交互
+    // searchP.debug: 可查看gltf box
+    ;['inputBlocked', 'ctrlBlocked', 'debug',].forEach((e) => {
+      if (searchP[e] != null) {
+        searchP[e] = true
+      }
+    })
+
+  searchP.autoRotateSpeed = str2Num(searchP.autoRotateSpeed, [0])
+  searchP.z = str2Num(searchP.z, [1e-4])
+
+  const [backgroundColorStr, backgroundOpacityStr] = searchP.bgColor?.split(/[,，]/) || []
+  const [backgroundColor, backgroundOpacity] = [str2Color(backgroundColorStr), str2Num(backgroundOpacityStr, [0, 1])]
+
+  const [lightColorStr, lightIntensityStr] = searchP.light?.split(/[,，]/) || []
+  const [lightColor, lightIntensity] = [str2Color(lightColorStr), str2Num(lightIntensityStr, [0], Boolean)]
+
+  return { ...searchP, backgroundColor, backgroundOpacity, lightColor, lightIntensity }
+}
+
+// ================== gltf input ===================
 function onUploadGLTF(onLoad, onError) {
   const fileInput = document.querySelector('input[type=file]')
   fileInput.addEventListener('change', ({ target }) => {
@@ -192,80 +221,78 @@ function onDragDropGLTF(onLoad, onError) {
   }, false)
 }
 
-function getSearchParams() {
-  const { href } = location
-  const { searchParams } = new URL(href)
-  const searchP = {}
-  const mustBeNumberKeys = ['autoRotateSpeed', 'z']
-  searchParams.entries().forEach(([k, v]) => {
-    if (v === '') {
-      searchP[k] = true
-      return
-    }
-    if (!Number.isNaN(+v)) {
-      v = +v
-    } else if (mustBeNumberKeys.includes(k)) {
-      v = undefined
-    }
-    searchP[k] = v
-  })
-  let [backgroundColorStr, backgroundOpacityStr] = searchParams.get('bgColor')?.split(/[,，]/) || []
-  if (backgroundColorStr?.length === 3) {
-    backgroundColorStr = [...backgroundColorStr].map(e => e.repeat(2)).join('')
+// =================== render utils ===================
+/**
+ * 更新 renderer size 和 cameras aspect
+ * @param {THREE.WebGLRenderer} renderer 
+ * @param  {...THREE.PerspectiveCamera} cameras 
+ * @returns 是否更新
+ */
+function resizeToDisplaySize(renderer, ...cameras) {
+  const canvas = renderer.domElement
+  const { width, clientWidth, height, clientHeight } = canvas
+  const needResize = clientWidth !== width || clientHeight !== height
+  if (needResize) {
+    renderer.setSize(clientWidth, clientHeight, false)
+    cameras.forEach(camera => {
+      camera.aspect = clientWidth / clientHeight
+      camera.updateProjectionMatrix()
+    })
   }
-  let backgroundColor
-  if (backgroundColorStr?.length === 6) {
-    backgroundColor = parseInt(backgroundColorStr, 16)
-    if (Number.isNaN(backgroundColor)) {
-      backgroundColor = undefined
-    }
-  }
-  let backgroundOpacity = +backgroundOpacityStr
-  if (Number.isNaN(backgroundOpacity) || backgroundOpacity > 1 || backgroundOpacity < 0) {
-    backgroundOpacity = undefined
-  }
-
-  // { debug, backgroundColor, backgroundOpacity, model, autoRotateSpeed, z }
-  console.log(searchP)
-  return { ...searchP, backgroundColor, backgroundOpacity }
+  return needResize
 }
 
-function createIframeLoading() {
-  const iframeT = document.createElement('iframe')
-  iframeT.src = './?model=./loading/scene.gltf&autoRotateSpeed=25&bgColor=e0dfdf,0.85&z=0.4'
-  iframeT.className = 'loading'
-  iframeT.hidden = true
-  document.body.appendChild(iframeT)
-  return function setLoading(flag) {
-    iframeT.hidden = !flag
-  }
-}
-
-const { model, ...args } = getSearchParams()
-const loadGLTF = initViewer(args)
-
-let setLoading
-  ; (function init() {
-    if (model != './loading/scene.gltf') {
-      setLoading = createIframeLoading()
-    }
-    if (model) {
-      loadGLTF(model)
-    } else {
-      document.body.setAttribute('data-content-hover', '点击上传glTF')
-      document.body.classList.add('hover')
-      const fileInput = document.querySelector('input[type=file]')
-      document.addEventListener('click', ({ target }) => {
-        if (target === document.body) {
-          fileInput.click()
-        }
+/**
+ * requestAnimationFrame debounce: 在一个动画帧内的频繁事件仅在下一次重绘前执行一次
+ * @param {(time: number) => void} cb 触发事件执行的回调
+ * @returns 防抖后的回调
+ */
+function rafDebounce(cb) {
+  let flag = false
+  return function () {
+    if (!flag) {
+      flag = true
+      requestAnimationFrame((time) => {
+        flag = false
+        cb?.(time)
       })
     }
-  })()
+  }
+}
 
-onUploadGLTF((...args) =>
-  loadGLTF(...args).finally(() => {
-    document.body.classList.remove('hover')
-  })
-  , console.error)
-onDragDropGLTF(loadGLTF, console.error)
+// =================== common utils ===================
+/**
+ * 'fff' / 'ffffff' -> 0xffffff
+ * @param {string} str 长度 3 or 6 的hex颜色字符串
+ * @returns color 16进制hex色彩值
+ */
+function str2Color(str) {
+  if (str?.length === 3) {
+    str = [...str].map(e => e.repeat(2)).join('')
+  }
+  let color
+  if (str?.length === 6) {
+    color = parseInt(str, 16)
+    if (Number.isNaN(color)) {
+      color = undefined
+    }
+  }
+  return color
+}
+
+/**
+ * 字符串转数字: 非法字符串返回 undefined
+ * @param {string} str 
+ * @param {[min: number, max: number]} minmax 
+ * @param {(str: string, num: string) => boolean} condition 
+ * @returns 
+ */
+function str2Num(str, [min, max] = [], condition) {
+  let num = +str
+  const z = !Number.isNaN(num) &&
+    num <= (max ?? num) &&
+    num >= (min ?? num) &&
+    !condition || condition?.(str, num)
+  if (z)
+    return num
+}
