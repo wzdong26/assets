@@ -1,6 +1,9 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
+import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js'
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js'
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js'
 import { parseDataTransferItems } from './readFiles.js'
 
 const { model, inputBlocked, ...args } = getSearchParams()
@@ -113,6 +116,13 @@ function traverseMaterials(object, callback) {
 // =================== gltf load manager ===================
 function gltfLoader() {
   const manager = new THREE.LoadingManager()
+  const THREE_PATH = `https://unpkg.com/three@0.${THREE.REVISION}.x`
+  const DRACO_LOADER = new DRACOLoader(manager).setDecoderPath(
+    `${THREE_PATH}/examples/jsm/libs/draco/gltf/`,
+  );
+  const KTX2_LOADER = new KTX2Loader(manager).setTranscoderPath(
+    `${THREE_PATH}/examples/jsm/libs/basis/`,
+  );
   manager.onStart = () => {
     setLoading?.(true)
   }
@@ -138,6 +148,9 @@ function gltfLoader() {
         return url
       })
       const loader = new GLTFLoader(manager)
+        .setDRACOLoader(DRACO_LOADER)
+        .setKTX2Loader(KTX2_LOADER)
+        .setMeshoptDecoder(MeshoptDecoder)
       const gltf = await loader.loadAsync(gltfUrl)
       objectURLs.forEach((url) => URL.revokeObjectURL(url))
       return gltf
