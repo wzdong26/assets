@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>glTF Display</title>
+	<style>
+		html,
+		body {
+			margin: 0;
+		}
+
+		canvas {
+			width: 100vw;
+			height: 100vh;
+			display: block;
+		}
+
+		form {
+			position: absolute;
+			top: 0;
+			width: 100%;
+			height: 100%;
+			display: flex;
+			flex-direction: column;
+			justify-content: center;
+			align-items: center;
+			gap: 30px;
+
+			&[hidden] {
+				display: none;
+			}
+
+			>.file-input {
+				box-sizing: border-box;
+				padding: 1rem 1.5rem;
+				font-size: 5rem;
+				background-color: #050505;
+				color: #fff;
+				border-radius: .8rem;
+				cursor: pointer;
+
+				&:hover {
+					background-color: #3d3d3d;
+				}
+
+				>input {
+					display: none;
+				}
+			}
+
+			>.url-input {
+				display: flex;
+				align-items: center;
+				gap: 1rem;
+				cursor: pointer;
+
+				>input {
+					max-width: 99vw;
+					box-sizing: border-box;
+					background-color: rgba(255, 255, 255, 0);
+					padding: 0.5rem 1rem;
+					font-size: 2rem;
+					text-align: center;
+					border-radius: .5rem;
+				}
+			}
+		}
+
+		.hover::after {
+			content: attr(data-content-hover);
+			background-color: rgba(23, 24, 23, 0.5);
+			color: #fff;
+			position: absolute;
+			z-index: 1;
+			top: 0;
+			width: 100%;
+			height: 100%;
+			padding: 20px;
+			box-sizing: border-box;
+			text-align: center;
+			display: flex;
+			justify-content: center;
+			align-items: center;
+			font-size: 5rem;
+		}
+
+		.loading {
+			position: absolute;
+			z-index: 2;
+			top: 0;
+			width: 100%;
+			height: 100%;
+			box-sizing: border-box;
+			border: 0;
+		}
+	</style>
+</head>
+
+<body>
+	<form method="dialog" action="">
+		<label class="file-input">Upload
+			<input type="file" multiple accept=".gltf,.glb" placeholder="Upload glTF(.glb/.gltf)" />
+		</label>
+		<label class="url-input"><input placeholder="Input glTF URL"
+				value="https://threejs.org/manual/examples/resources/models/cartoon_lowpoly_small_city_free_pack/scene.gltf" /></label>
+	</form>
+</body>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://threejs.org/build/three.module.js",
+		"three/examples/": "https://threejs.org/examples/"
+  }
+}
+</script>
+<script type="module" src="./editor.js"></script>
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/dat.gui@0.7.9/build/dat.gui.min.js"></script>
+
+</html>
