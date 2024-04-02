@@ -66,6 +66,13 @@
 					border-radius: .5rem;
 				}
 			}
+
+			>.url-demo {
+				>div {
+					/* margin-left: 2px; */
+					/* display: inline-block; */
+				}
+			}
 		}
 
 		.hover::after {
@@ -103,8 +110,10 @@
 		<label class="file-input">Upload
 			<input type="file" multiple accept=".gltf,.glb" placeholder="Upload glTF(.glb/.gltf)" />
 		</label>
-		<label class="url-input"><input placeholder="Input glTF URL"
-				value="https://threejs.org/manual/examples/resources/models/cartoon_lowpoly_small_city_free_pack/scene.gltf" /></label>
+		<label class="url-input"><input placeholder="Input glTF URL" /></label>
+		<div class="url-demo"><b>输入示例：</b>
+			<div>https://threejs.org/examples/models/gltf/RobotExpressive/RobotExpressive.glb</div>
+		</div>
 	</form>
 </body>
 <script type="importmap">

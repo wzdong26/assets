@@ -3,7 +3,7 @@ import { Viewer } from './Viewer.js'
 main()
 
 function main() {
-  const { model, enableCtrl, backgroundColor, backgroundOpacity, autoRotateSpeed, lightColor, lightIntensity, z, debug, wireframe } = getSearchParams()
+  const { model, enableCtrl, backgroundColor, backgroundOpacity, autoRotateSpeed, lightColor, lightIntensity, z, alpha, debug, wireframe } = getSearchParams()
 
   if (!model) return
 
@@ -16,12 +16,11 @@ function main() {
   enableCtrl && viewer.enableCtrl(enableCtrl)
   autoRotateSpeed && viewer.autoRotate(autoRotateSpeed)
   lightColor || lightIntensity != null && viewer.setLight({ color: lightColor, intensity: lightIntensity })
+  debug && viewer.gltfBoxHelper()
 
   const loadGLTF = (...p) => {
-    viewer.unloadGLTF()
     viewer.loadGLTF(...p).then(() => {
-      viewer.gltfAlignCenter(z)
-      debug && viewer.gltfBoxHelper()
+      viewer.gltfAlignCenter({ zoom: z, alpha })
       wireframe && viewer.gltfWireFrame(wireframe)
     })
   }
@@ -46,6 +45,7 @@ function getSearchParams() {
 
   searchP.autoRotateSpeed = str2Num(searchP.autoRotateSpeed, [0])
   searchP.z = str2Num(searchP.z, [1e-4])
+  searchP.alpha = str2Num(searchP.alpha, [1e-4])
 
   const [backgroundColorStr, backgroundOpacityStr] = searchP.bgColor?.split(/[,，]/) || []
   const [backgroundColor, backgroundOpacity] = [str2Color(backgroundColorStr), str2Num(backgroundOpacityStr, [0, 1])]

@@ -8,7 +8,8 @@ import {
   REVISION,
   Box3,
   Vector3,
-  BoxHelper
+  BoxHelper,
+  AnimationMixer,
 } from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
@@ -36,8 +37,10 @@ export class Viewer {
   controls
   /** @type {import('three').Light} */
   light
+  /** @type {GLTF} */
+  gltf
 
-  /** @param {{camera: PerspectiveCameraOptions; renderer: WebGLRendererParameters}} param */
+  /** @param {{camera: PerspectiveCameraOptions; renderer: WebGLRendererParameters}} */
   constructor({ camera: { fov, near, far } = {}, renderer = {} } = {}) {
     this.scene = new Scene()
     this.camera = new PerspectiveCamera(fov ?? 75, 2, near ?? 0.1, far ?? 10000)
@@ -50,10 +53,15 @@ export class Viewer {
     this.scene.add(this.light)
     GLTF_LOADER.ktx2LoaderDetectSupport(this.renderer)
   }
-  render = rafDebounce(() => {
+  /** @private @type {number} */
+  _prevRenderTime
+  render = rafDebounce((time) => {
+    const delta = (time - this._prevRenderTime) / 1000
     this._resizeToDisplaySize()
     this.controls.update()
+    this._mixer && this._mixer.update(delta)
     this.renderer.render(this.scene, this.camera)
+    this._prevRenderTime = time
   })
   /**@private */
   _resizeToDisplaySize() {
@@ -85,51 +93,42 @@ export class Viewer {
     this.controls.enabled = enabled
     this.render()
   }
-  /**
-   * @param {{color: ColorRepresentation; intensity: number}} color 
-   */
+  /** @param {{color: ColorRepresentation; intensity: number}} */
   setLight({ color, intensity } = {}) {
     color != null && (this.light.color.set(color))
     intensity != null && (this.light.intensity = intensity)
     this.render()
   }
-  /** @type {GLTF} */
-  gltf
   /**
    * @param {string} url 
    * @param {Record<string, Blob>} blobs 
    */
   async loadGLTF(url, blobs) {
-    const gltf = await GLTF_LOADER.load(url, blobs)
-    this.gltf = gltf
-    this.scene.add(gltf.scene)
-    this.gltfAlignCenter()
+    this.unloadGLTF()
+    this.gltf = await GLTF_LOADER.load(url, blobs)
+    this.scene.add(this.gltf.scene)
+
+    this.gltfAlignCenter(this._alignCenterParams)
+    this._wireFrame && this.gltfWireFrame(this._wireFrame)
+    this._boxHelper?.setFromObject(this.gltf.scene)
+
     this.render()
-    return gltf
+    return this.gltf
   }
   unloadGLTF() {
+    this.mixer()?.destroy()
     const { gltf } = this
     gltf && this.scene.remove(gltf.scene)
-    this.gltfBoxHelper()
     this.gltf = null
     this.render()
     return !gltf
   }
-  /** @param {boolean} wireframe */
-  gltfWireFrame(wireframe) {
-    if (!this.gltf) return false
-    const model = this.gltf.scene
-    model.traverse((node) => {
-      if (!node.geometry) return;
-      const materials = Array.isArray(node.material) ? node.material : [node.material];
-      materials.forEach((material) => {
-        material.wireframe = wireframe
-      });
-    })
-    this.render()
-  }
-  /** @param {number} z */
-  gltfAlignCenter(z) {
+  /** @typedef {{zoom: number; alpha: number}} AlignCenterParams */
+  /** @private @type {AlignCenterParams} */
+  _alignCenterParams = {}
+  /** @param {AlignCenterParams} */
+  gltfAlignCenter({ zoom, alpha } = {}) {
+    this._alignCenterParams = { zoom, alpha }
     if (!this.gltf) return false
     const model = this.gltf.scene
     model.updateMatrixWorld() // important! 更新模型的世界矩阵
@@ -141,30 +140,80 @@ export class Viewer {
     this.camera.near = size / 100
     this.camera.far = size * 100
     this.camera.position.copy(center)
-    this.camera.position.x += size / (z ?? 2.0)
-    this.camera.position.y += size / 5.0
-    this.camera.position.z += size / (z ?? 2.0)
+    this.camera.position.x += size / (zoom ?? 2.0)
+    this.camera.position.y += size / (alpha ?? 5.0)
+    this.camera.position.z += size / (zoom ?? 2.0)
     this.camera.updateProjectionMatrix() // important! 更新相机的投影矩阵
     this.controls.target = center
     this.render()
   }
-  /** @type {BoxHelper} */
-  boxHelper
+  /** @private @type {boolean} */
+  _wireFrame
+  /** @param {boolean} wireframe */
+  gltfWireFrame(wireframe) {
+    this._wireFrame = wireframe
+    if (!this.gltf) return false
+    const model = this.gltf.scene
+    model.traverse((node) => {
+      if (!node.geometry) return
+      const materials = Array.isArray(node.material) ? node.material : [node.material]
+      materials.forEach((material) => {
+        material.wireframe = wireframe
+      })
+    })
+    this.render()
+  }
+  /** @private @type {BoxHelper} */
+  _boxHelper
   /** @param {ColorRepresentation} color */
   gltfBoxHelper(color) {
+    if (color == null && this._boxHelper) return this._boxHelper
+    this._boxHelper = new BoxHelper(this.gltf?.scene, color)
+    this.scene.add(this._boxHelper)
+    const dispose = this._boxHelper.dispose.bind(this._boxHelper)
+    return Object.assign(this._boxHelper, {
+      dispose: () => {
+        this.scene.remove(this._boxHelper)
+        dispose()
+        this._boxHelper = null
+      }
+    })
+  }
+  /** @private @type {AnimationMixer & {destroy: () => void}} */
+  _mixer
+  mixer() {
+    if (this._mixer) return this._mixer
+    if (!this.gltf) return
+    const { animations, scene } = this.gltf
+    if (!animations?.length) return
+    this._mixer = new AnimationMixer(scene)
+    const animationFrame = setInterval(this.render.bind(this))
+    return Object.assign(this._mixer, {
+      destroy: () => {
+        clearInterval(animationFrame)
+        this._mixer.stopAllAction()
+        this._mixer.uncacheRoot(this._mixer.getRoot())
+        this._mixer = null
+      }
+    })
+  }
+  /** @private @type {number} */
+  _animateTimer
+  gltfAnimate(name, cleanup) {
     if (!this.gltf) return false
-    const { boxHelper } = this
-    if (boxHelper) {
-      this.scene.remove(this.boxHelper)
-      this.boxHelper = null
+    const { animations } = this.gltf
+    const clip = animations.find(({ name: _n }) => name === _n)
+    if (!clip) return false
+    if (cleanup) {
+      this.mixer()?.uncacheAction(clip)
     } else {
-      const model = this.gltf.scene
-      this.boxHelper = new BoxHelper(model, color)
-      this.boxHelper.update()
-      this.scene.add(this.boxHelper)
+      const action = this.mixer()?.clipAction(clip)
+      action?.reset().play()
     }
-    this.render()
-    return !boxHelper
+  }
+  gltfAnimateCleanup() {
+    this._lastAction?.fadeOut(dur)
+    clearInterval(this._animateTimer)
   }
 }
 
