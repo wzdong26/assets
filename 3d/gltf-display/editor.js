@@ -1,9 +1,11 @@
 
-import { Viewer } from './Viewer.js'
+import { ViewerConfigurator } from './ViewerConfigurator.js'
 import { parseDataTransferItems } from './readFiles.js'
-// import { GUI } from 'three/examples/jsm/libs/lil-gui.module.min.js'
 
 const gui = new dat.GUI()
+
+const configurator = new ViewerConfigurator(true)
+const { viewer, conf } = configurator
 
 {
   const basicFolder = gui.addFolder('Basic')
@@ -34,80 +36,76 @@ const gui = new dat.GUI()
       viewer.render()
     }
   }, 'saveImg')
+  basicFolder.add({
+    share() {
+      if (!modelUrl) return
+      let search = `model=${encodeURIComponent(modelUrl)}&`
+      const { model, animations, bgColor, bgOpacity, lightColor, lightIntensity, ...newConf } = conf
+      search += `animations=${encodeURIComponent(animations.join(','))}&`
+      search += `bgColor=${encodeURIComponent(bgColor) + ',' + encodeURIComponent(bgOpacity)}&`
+      search += `light=${encodeURIComponent(lightColor) + ',' + encodeURIComponent(lightIntensity)}&`
+      Object.entries(newConf).forEach(([k, v]) => {
+        if (!v) return
+        search += `${k}=${encodeURIComponent(v)}&`
+      })
+      window.open(new URL(`./?${search}`, location.href))
+    }
+  }, 'share')
 }
 
 {
-  const sceneOptions = { bgColor: '#ffffff', bgOpacity: 1, enableCtrl: true, rotateSpeed: 0 }
   const sceneFolder = gui.addFolder('Scene')
-  sceneFolder.addColor(sceneOptions, 'bgColor')
-    .onChange((color) => viewer.setBgColor(color, sceneOptions.bgOpacity))
-  sceneFolder.add(sceneOptions, 'bgOpacity', 0, 1)
-    .onChange((opacity) => viewer.setBgColor(sceneOptions.bgColor, opacity))
-  sceneFolder.add(sceneOptions, 'enableCtrl')
-    .onChange((e) => viewer.enableCtrl(e))
-  sceneFolder.add(sceneOptions, 'rotateSpeed', -100, 100)
-    .onChange((e) => viewer.autoRotate(e))
+  sceneFolder.addColor(conf, 'bgColor')
+  sceneFolder.add(conf, 'bgOpacity', 0, 1)
+  sceneFolder.add(conf, 'enableCtrl')
+  sceneFolder.add(conf, 'rotate', -100, 100)
 }
 
 {
-  const lightOptions = { color: '#ffffff', intensity: 1 }
   const lightFolder = gui.addFolder('Light')
-  lightFolder.addColor(lightOptions, 'color')
-    .onChange((color) => viewer.setLight({ color }))
-  lightFolder.add(lightOptions, 'intensity', 0, 8)
-    .onChange((intensity) => viewer.setLight({ intensity }))
+  lightFolder.addColor(conf, 'lightColor')
+  lightFolder.add(conf, 'lightIntensity', 0, 8)
 }
 
 {
-  const modelOptions = { wireFrame: false, boxHelper: false, zoom: 2.0, alpha: 5.0 }
   const modelFolder = gui.addFolder('Model')
-  modelFolder.add(modelOptions, 'wireFrame')
-    .onChange((v) => viewer.gltfWireFrame(v))
-  modelFolder.add(modelOptions, 'boxHelper')
-    .onChange((v) => {
-      v ? viewer.gltfBoxHelper() : viewer.gltfBoxHelper().dispose()
-    })
-  modelFolder.add(modelOptions, 'zoom', 0.1, 10)
-    .onChange((v) => viewer.gltfAlignCenter({ zoom: v }))
-  modelFolder.add(modelOptions, 'alpha', 1, 7)
-    .onChange((v) => viewer.gltfAlignCenter({ alpha: v }))
+  modelFolder.add(conf, 'wireFrame')
+  modelFolder.add(conf, 'boxHelper')
+  modelFolder.add(conf, 'zoom', 0.1, 10)
+  modelFolder.add(conf, 'alpha', 1, 7)
 }
 
 let animationsFolder
 function addAnimationsGUI(animations) {
   if (!animations?.length) return
-  const options = { animation: animations[0].name, playbackSpeed: 1 }
   try {
     gui.removeFolder(animationsFolder)
   } catch { }
   animationsFolder = gui.addFolder('Animations')
-  animationsFolder.add(options, 'playbackSpeed', 0, 2)
-    .onChange(v => {
-      if (!viewer.mixer()) {
-        options.playbackSpeed = 1
-        return
+  animationsFolder.add(conf, 'animationSpeed', 0, 2)
+    ; animations.forEach(({ name }, idx) => {
+      const opts = { [name]: false }
+      if (idx === 0) {
+        opts[name] = true
+        conf.animations = [name]
       }
-      viewer.mixer().timeScale = v
+      animationsFolder.add(opts, name).name(`${idx + 1}. ${name}`)
+        .onChange(v => {
+          if (v) {
+            conf.animations = [...conf.animations, name]
+          } else {
+            const idx = conf.animations.indexOf(name)
+            if (idx >= 0) {
+              conf.animations.splice(idx, 1)
+              conf.animations = [...conf.animations]
+            }
+          }
+        })
     })
-  animations.forEach(({ name }, idx) => {
-    options[name] = false
-    if (idx === 0) {
-      viewer.gltfAnimate(animations[0].name)
-      options[name] = true
-    }
-    animationsFolder.add(options, name).name(`${idx + 1}. ${name}`)
-      .onChange(v => {
-        viewer.gltfAnimate(name, !v)
-      })
-  })
 }
 
 const form = document.querySelector('form')
 const [fileInput, urlInput] = form
-const canvas = document.createElement('canvas')
-
-const viewer = new Viewer({ renderer: { canvas } })
-document.body.appendChild(canvas)
 
 const loadGLTF = (...p) => {
   setLoading(true)
@@ -128,7 +126,7 @@ onDragDropGLTF(loadGLTF, console.error)
 // =================== loading ===================
 const setLoading = (function createIframeLoading() {
   const iframeT = document.createElement('iframe')
-  iframeT.src = './?model=./loading/scene.gltf&autoRotateSpeed=30&bgColor=e0dfdf,0.85&z=0.35'
+  iframeT.src = './?model=./loading/scene.gltf&rotate=30&bgColor=e0dfdf,0.85&zoom=0.35'
   iframeT.className = 'loading'
   iframeT.hidden = true
   document.body.appendChild(iframeT)
@@ -178,21 +176,23 @@ const setLoading = (function createIframeLoading() {
     })
   })()
 
+let modelUrl;
 function onUploadGLTF(onLoad, onError) {
   const fileInputOrigin = document.getElementById('fileInput')
   fileInputOrigin.addEventListener('change', ({ target }) => {
     const { files } = target
     for (const file of files) {
       if (file.name.match(/\.gl(b|tf)$/)) {
-        onLoad?.(file.name, { [file.name]: file })
+        modelUrl = URL.createObjectURL(file)
+        onLoad?.(modelUrl)
         return
       }
     }
     onError?.('Not gltf')
   })
   form.addEventListener('submit', (e) => {
-    const url = urlInput.value
-    onLoad?.(url)
+    modelUrl = urlInput.value
+    onLoad?.(modelUrl)
   })
 }
 

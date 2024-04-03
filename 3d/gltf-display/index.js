@@ -1,31 +1,10 @@
-import { Viewer } from './Viewer.js'
+import { ViewerConfigurator } from './ViewerConfigurator.js'
 
 main()
 
 function main() {
-  const { model, enableCtrl, backgroundColor, backgroundOpacity, autoRotateSpeed, lightColor, lightIntensity, z, alpha, debug, wireframe } = getSearchParams()
-
-  if (!model) return
-
-  const canvas = document.createElement('canvas')
-  const viewer = new Viewer({ renderer: { canvas } })
-  document.body.appendChild(canvas)
-
-  backgroundColor && viewer.setBgColor(backgroundColor, backgroundOpacity)
-  viewer.enableCtrl(false)
-  enableCtrl && viewer.enableCtrl(enableCtrl)
-  autoRotateSpeed && viewer.autoRotate(autoRotateSpeed)
-  lightColor || lightIntensity != null && viewer.setLight({ color: lightColor, intensity: lightIntensity })
-  debug && viewer.gltfBoxHelper()
-
-  const loadGLTF = (...p) => {
-    viewer.loadGLTF(...p).then(() => {
-      viewer.gltfAlignCenter({ zoom: z, alpha })
-      wireframe && viewer.gltfWireFrame(wireframe)
-    })
-  }
-
-  loadGLTF(model)
+  const configurator = new ViewerConfigurator()
+  configurator.setConf(getSearchParams())
 }
 
 // =================== searchParams input ===================
@@ -33,27 +12,33 @@ function getSearchParams() {
   const { href } = location
   const { searchParams } = new URL(href)
   const searchP = Object.fromEntries(searchParams.entries())
-    // inputBlocked: 只可查看model，不可input gltf
-    // enableCtrl: controls可交互
-    // debug: 可查看gltf box
-    // wireframe: 可查看gltf wireframe
-    ;['enableCtrl', 'debug', 'wireframe'].forEach((e) => {
+
+  if (!searchP.model) return {}
+
+  searchP.model = [searchP.model]
+  searchP.enableCtrl = searchP.enableCtrl != null
+    ;['boxHelper', 'wireFrame'].forEach((e) => {
       if (searchP[e] != null) {
         searchP[e] = true
       }
     })
 
-  searchP.autoRotateSpeed = str2Num(searchP.autoRotateSpeed, [0])
-  searchP.z = str2Num(searchP.z, [1e-4])
+  searchP.rotate = str2Num(searchP.rotate, [-100, 100])
+  searchP.zoom = str2Num(searchP.zoom, [1e-4])
   searchP.alpha = str2Num(searchP.alpha, [1e-4])
+  searchP.animationSpeed = str2Num(searchP.animationSpeed, [0, 3])
 
   const [backgroundColorStr, backgroundOpacityStr] = searchP.bgColor?.split(/[,，]/) || []
-  const [backgroundColor, backgroundOpacity] = [str2Color(backgroundColorStr), str2Num(backgroundOpacityStr, [0, 1])]
+  const [bgColor, bgOpacity] = [str2Color(backgroundColorStr), str2Num(backgroundOpacityStr, [0, 1])]
 
   const [lightColorStr, lightIntensityStr] = searchP.light?.split(/[,，]/) || []
+  searchP.light = undefined
   const [lightColor, lightIntensity] = [str2Color(lightColorStr), str2Num(lightIntensityStr, [0], Boolean)]
 
-  return { ...searchP, backgroundColor, backgroundOpacity, lightColor, lightIntensity }
+  const animations = searchP.animations?.split(/[,，]/)
+
+  const rst = JSON.parse(JSON.stringify({ ...searchP, bgColor, bgOpacity, lightColor, lightIntensity, animations }))
+  return rst
 }
 
 // =================== common utils ===================
@@ -63,6 +48,7 @@ function getSearchParams() {
  * @returns color 16进制hex色彩值
  */
 function str2Color(str) {
+  if (str?.startsWith('#') && [4, 7].includes(str.length)) return str
   if (str?.length === 3) {
     str = [...str].map(e => e.repeat(2)).join('')
   }

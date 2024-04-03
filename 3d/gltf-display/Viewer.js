@@ -118,9 +118,10 @@ export class Viewer {
     this.gltf = await GLTF_LOADER.load(url, blobs)
     this.scene.add(this.gltf.scene)
 
-    this.gltfAlignCenter(this._alignCenterParams)
+    this.gltfAlignCenter()
     this._wireFrame && this.gltfWireFrame(this._wireFrame)
     this._boxHelper?.setFromObject(this.gltf.scene)
+    this.gltfAnimate()
 
     this.render()
     return this.gltf
@@ -135,10 +136,12 @@ export class Viewer {
   }
   /** @typedef {{zoom: number; alpha: number}} AlignCenterParams */
   /** @private @type {AlignCenterParams} */
-  _alignCenterParams = {}
+  _alignCenterParams = { zoom: 2.0, alpha: 5.0 }
   /** @param {AlignCenterParams} */
   gltfAlignCenter({ zoom, alpha } = {}) {
-    this._alignCenterParams = { zoom, alpha }
+    if (zoom != null) this._alignCenterParams.zoom = zoom
+    if (alpha != null) this._alignCenterParams.alpha = alpha
+    const { zoom: _zoom, alpha: _alpha } = this._alignCenterParams
     if (!this.gltf) return false
     const model = this.gltf.scene
     model.updateMatrixWorld() // important! 更新模型的世界矩阵
@@ -150,9 +153,9 @@ export class Viewer {
     this.camera.near = size / 100
     this.camera.far = size * 100
     this.camera.position.copy(center)
-    this.camera.position.x += size / (zoom ?? 2.0)
-    this.camera.position.y += size / (alpha ?? 5.0)
-    this.camera.position.z += size / (zoom ?? 2.0)
+    this.camera.position.x += size / (zoom ?? _zoom)
+    this.camera.position.y += size / (alpha ?? _alpha)
+    this.camera.position.z += size / (zoom ?? _zoom)
     this.camera.updateProjectionMatrix() // important! 更新相机的投影矩阵
     this.controls.target = center
     this.render()
@@ -204,23 +207,34 @@ export class Viewer {
       destroy: () => {
         clearInterval(animationFrame)
         this._mixer.stopAllAction()
+        this._animationNames.clear()
         this._mixer.uncacheRoot(this._mixer.getRoot())
         this._mixer = null
       }
     })
   }
-  /** @private @type {number} */
-  _animateTimer
-  gltfAnimate(name, cleanup) {
+  _animationNames = []
+  /**
+   * @param {string[]} names 
+   */
+  gltfAnimate(names) {
+    let cleanupNames
+    if (names) {
+      cleanupNames = this._animationNames.filter(e => !names.includes(e))
+      this._animationNames = [...names]
+    } else {
+      names = this._animationNames
+    }
     if (!this.gltf) return false
     const { animations } = this.gltf
-    const clip = animations.find(({ name: _n }) => name === _n)
-    if (!clip) return false
-    if (cleanup) {
-      this.mixer()?.uncacheAction(clip)
-    } else {
-      const action = this.mixer()?.clipAction(clip)
-      action?.reset().play()
+    for (const clip of animations) {
+      if (names.includes(clip.name)) {
+        const action = this.mixer()?.clipAction(clip)
+        action?.reset().play()
+      }
+      if (cleanupNames?.includes(clip.name)) {
+        this.mixer()?.uncacheAction(clip)
+      }
     }
   }
 }
