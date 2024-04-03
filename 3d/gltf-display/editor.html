@@ -78,23 +78,23 @@
 					padding: .5rem;
 					border-radius: .4rem;
 
-					h4 {
+					>h4 {
 						margin: 0;
 					}
 
-					ul {
+					>ul {
 						margin: 0;
 						max-height: 200px;
 						overflow: auto;
-					}
 
-					li {
-						margin-left: -1.2rem;
-						cursor: pointer;
-						margin-top: .5rem;
+						>li {
+							margin-left: -1.2rem;
+							cursor: pointer;
+							margin-top: .5rem;
 
-						&:active {
-							text-decoration: underline;
+							&:active {
+								text-decoration: underline;
+							}
 						}
 					}
 				}
@@ -134,7 +134,7 @@
 <body>
 	<form method="dialog">
 		<button type="button" class="file-input">
-			<label for="fileInput">Upload </label>
+			<label for="fileInput">Upload</label>
 		</button>
 		<div class="url-input"><input id="urlInput" type="search" placeholder="Input glTF URL(.glb/.gltf)" />
 			<div class="url-recommend" hidden>

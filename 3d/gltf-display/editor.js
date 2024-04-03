@@ -151,8 +151,8 @@ const setLoading = (function createIframeLoading() {
     urlInput.addEventListener('input', ({ target }) => {
       fileInput.setAttribute('type', target.value ? 'submit' : 'button')
       const [label] = fileInput.children
-      label.setAttribute('for', target.value ? 'urlInput' : 'fileInput')
-      label.innerText = target.value ? 'Submit' : 'Upload'
+      label.setAttribute('for', target.value ? '' : 'fileInput')
+      label.innerHTML = target.value ? '<output>Submit</output>' : 'Upload'
     })
     let isFocus, isPointerover
     urlInput.addEventListener('focus', () => {
@@ -179,7 +179,8 @@ const setLoading = (function createIframeLoading() {
   })()
 
 function onUploadGLTF(onLoad, onError) {
-  fileInput.addEventListener('change', ({ target }) => {
+  const fileInputOrigin = document.getElementById('fileInput')
+  fileInputOrigin.addEventListener('change', ({ target }) => {
     const { files } = target
     for (const file of files) {
       if (file.name.match(/\.gl(b|tf)$/)) {
