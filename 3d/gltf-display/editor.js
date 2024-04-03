@@ -8,10 +8,15 @@ const gui = new dat.GUI()
 {
   const basicFolder = gui.addFolder('Basic')
   basicFolder.add({
-    init: function () {
+    HOME() {
       form.hidden = !form.hidden
     }
-  }, 'init')
+  }, 'HOME')
+  basicFolder.add({
+    saveImg() {
+      console.log('saveImg')
+    }
+  }, 'saveImg')
 }
 
 {
@@ -82,6 +87,16 @@ function addAnimationsGUI(animations) {
 
 const canvas = document.createElement('canvas')
 const form = document.querySelector('form')
+const demoList = document.querySelector('.demo-list')
+demoList.addEventListener('click', ({ target }) => {
+  form[2].value = target.innerText
+  form[2].scrollBy({ left: 999 })
+})
+// form[2].addEventListener('change', ({ target }) => {
+//   console.log(target,form[0],form[0].type)
+//   form[0].type = target.value ? 'submit' : 'button'
+// })
+
 const viewer = new Viewer({ renderer: { canvas } })
 document.body.appendChild(canvas)
 
@@ -127,7 +142,7 @@ function onUploadGLTF(onLoad, onError) {
     onError?.('Not gltf')
   })
   form.addEventListener('submit', (e) => {
-    const url = e.target[1].value
+    const url = e.target[2].value
     onLoad?.(url)
   })
 }

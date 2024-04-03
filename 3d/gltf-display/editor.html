@@ -35,9 +35,10 @@
 			}
 
 			>.file-input {
+				width: min(22rem, 90vw);
 				box-sizing: border-box;
-				padding: 1rem 1.5rem;
-				font-size: 5rem;
+				padding: 1rem 0;
+				font-size: min(21vw, 5rem);
 				background-color: #050505;
 				color: #fff;
 				border-radius: .8rem;
@@ -47,7 +48,7 @@
 					background-color: #3d3d3d;
 				}
 
-				>input {
+				input {
 					display: none;
 				}
 			}
@@ -59,7 +60,7 @@
 				cursor: pointer;
 
 				>input {
-					max-width: 99vw;
+					width: min(22rem, 90vw);
 					box-sizing: border-box;
 					background-color: rgba(253, 253, 253, 0.6);
 					padding: 0.8rem 1rem;
@@ -71,12 +72,32 @@
 			}
 
 			>.url-demo {
-				max-width: 94vw;
-				text-align: center;
+				max-width: 90vw;
+				max-height: 200px;
+				overflow: auto;
+				overflow-wrap: break-word;
+				color: #757575;
+				border-left: #807f7f 3px solid;
+				background-color: rgba(212, 212, 212, 0.5);
+				box-sizing: border-box;
+				padding: .5rem;
 
-				>div {
-					margin-top: 1px;
-					overflow-wrap: break-word;
+				h4 {
+					margin: 0 0 .5rem 0;
+				}
+
+				ul {
+					margin: 0;
+				}
+
+				li {
+					margin-left: -1.2rem;
+					cursor: pointer;
+					margin-top: .5rem;
+
+					&:hover {
+						text-decoration: underline;
+					}
 				}
 			}
 		}
@@ -113,12 +134,20 @@
 
 <body>
 	<form method="dialog">
-		<label class="file-input">Upload
-			<input type="file" multiple accept=".gltf,.glb" placeholder="Upload glTF(.glb/.gltf)" />
-		</label>
-		<label class="url-input"><input placeholder="Input glTF URL" /></label>
-		<div class="url-demo"><b>Input Demo：</b>
-			<div>https://threejs.org/examples/models/gltf/RobotExpressive/RobotExpressive.glb</div>
+		<button type="button" class="file-input">
+			<label>Upload
+				<input type="file" accept=".gltf,.glb" placeholder="Upload glTF(.glb/.gltf)" />
+			</label>
+		</button>
+		<label class="url-input"><input type="search" placeholder="Input glTF URL(.glb/.gltf)" /></label>
+		<div class="url-demo">
+			<h4>Input Demo：</h4>
+			<ul class="demo-list">
+				<li>https://threejs.org/examples/models/gltf/LittlestTokyo.glb</li>
+				<li>https://threejs.org/examples/models/gltf/Soldier.glb</li>
+				<li>https://threejs.org/examples/models/gltf/Xbot.glb</li>
+				<li>https://threejs.org/examples/models/gltf/RobotExpressive/RobotExpressive.glb</li>
+			</ul>
 		</div>
 	</form>
 </body>
