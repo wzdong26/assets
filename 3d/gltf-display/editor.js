@@ -5,8 +5,17 @@ import { parseDataTransferItems } from './readFiles.js'
 
 const gui = new dat.GUI()
 
-const sceneOptions = { bgColor: '#ffffff', bgOpacity: 1, enableCtrl: true, rotateSpeed: 0 }
 {
+  const basicFolder = gui.addFolder('Basic')
+  basicFolder.add({
+    init: function () {
+      form.hidden = !form.hidden
+    }
+  }, 'init')
+}
+
+{
+  const sceneOptions = { bgColor: '#ffffff', bgOpacity: 1, enableCtrl: true, rotateSpeed: 0 }
   const sceneFolder = gui.addFolder('Scene')
   sceneFolder.addColor(sceneOptions, 'bgColor')
     .onChange((color) => viewer.setBgColor(color, sceneOptions.bgOpacity))
@@ -18,8 +27,8 @@ const sceneOptions = { bgColor: '#ffffff', bgOpacity: 1, enableCtrl: true, rotat
     .onChange((e) => viewer.autoRotate(e))
 }
 
-const lightOptions = { color: '#ffffff', intensity: 1 }
 {
+  const lightOptions = { color: '#ffffff', intensity: 1 }
   const lightFolder = gui.addFolder('Light')
   lightFolder.addColor(lightOptions, 'color')
     .onChange((color) => viewer.setLight({ color }))
@@ -27,8 +36,8 @@ const lightOptions = { color: '#ffffff', intensity: 1 }
     .onChange((intensity) => viewer.setLight({ intensity }))
 }
 
-const modelOptions = { wireFrame: false, boxHelper: false, zoom: 2.0, alpha: 5.0 }
 {
+  const modelOptions = { wireFrame: false, boxHelper: false, zoom: 2.0, alpha: 5.0 }
   const modelFolder = gui.addFolder('Model')
   modelFolder.add(modelOptions, 'wireFrame')
     .onChange((v) => viewer.gltfWireFrame(v))
@@ -36,7 +45,7 @@ const modelOptions = { wireFrame: false, boxHelper: false, zoom: 2.0, alpha: 5.0
     .onChange((v) => {
       v ? viewer.gltfBoxHelper() : viewer.gltfBoxHelper().dispose()
     })
-  modelFolder.add(modelOptions, 'zoom', 0.1, 15)
+  modelFolder.add(modelOptions, 'zoom', 0.1, 10)
     .onChange((v) => viewer.gltfAlignCenter({ zoom: v }))
   modelFolder.add(modelOptions, 'alpha', 1, 7)
     .onChange((v) => viewer.gltfAlignCenter({ alpha: v }))
@@ -119,30 +128,36 @@ function onUploadGLTF(onLoad, onError) {
   })
   form.addEventListener('submit', (e) => {
     const url = e.target[1].value
-    try {
-      new URL(url)
-      onLoad?.(url)
-    } catch {
-      onError?.('Invalid URL')
-    }
+    onLoad?.(url)
   })
 }
 
 function onDragDropGLTF(onLoad, onError) {
   const dropArea = document.body
-  dropArea.addEventListener('dragenter', () => {
-    document.body.setAttribute('data-content-hover', '拖拽glTF文件放置此处（支持.gltf/.glb）')
-    dropArea.classList.add('hover')
-  })
-  dropArea.addEventListener('dragover', (evt) => evt.preventDefault())
-    ;['dragleave', 'drop', 'click'].forEach(e => {
-      dropArea.addEventListener(e, (evt) => {
-        evt.preventDefault()
-        if (evt.target === dropArea) {
-          dropArea.classList.remove('hover')
-        }
+  dropArea.addEventListener('dragenter', ondragenter)
+  function ondragenter(evt) {
+    dropArea.classList.add('dragging-hover')
+    if (evt.target !== dropArea) return
+    const ondragover = (evt) => evt.preventDefault()
+    const onEnd = (evt) => {
+      evt.preventDefault()
+      if (evt.target === dropArea) {
+        dropArea.classList.remove('dragging-hover')
+        cleanup()
+      }
+    }
+    dropArea.addEventListener('dragover', ondragover)
+      ;['dragleave', 'drop', 'click'].forEach(e => {
+        dropArea.addEventListener(e, onEnd)
       })
-    })
+    function cleanup() {
+      dropArea.removeEventListener('dragover', ondragover)
+        ;['dragleave', 'drop', 'click'].forEach(e => {
+          dropArea.removeEventListener(e, onEnd)
+        })
+    }
+    return cleanup
+  }
   dropArea.addEventListener('drop', async ({ dataTransfer }) => {
     const { items } = dataTransfer || {} // 获取文件列表
     const files = await Promise.all(await parseDataTransferItems(items))
