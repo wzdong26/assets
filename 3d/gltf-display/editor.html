@@ -36,17 +36,17 @@
 
 			>.file-input {
 				width: min(22rem, 90vw);
-				padding: 2px;
+				padding: 0;
 				border: 0;
 				background-color: #000000d8;
 				border-radius: .8rem;
+				color: #fff;
+				font-size: min(21vw, 5rem);
 
 				>label {
 					display: block;
-					width: 100%;
 					padding: 1rem 0;
-					font-size: min(21vw, 5rem);
-					color: #fff;
+					width: 100%;
 					cursor: pointer;
 				}
 
@@ -136,7 +136,7 @@
 		<button type="button" class="file-input">
 			<label for="fileInput">Upload </label>
 		</button>
-		<div class="url-input"><input type="search" placeholder="Input glTF URL(.glb/.gltf)" />
+		<div class="url-input"><input id="urlInput" type="search" placeholder="Input glTF URL(.glb/.gltf)" />
 			<div class="url-recommend" hidden>
 				<h4>Recommend: </h4>
 				<ul>

@@ -150,9 +150,8 @@ const setLoading = (function createIframeLoading() {
     })
     urlInput.addEventListener('input', ({ target }) => {
       fileInput.setAttribute('type', target.value ? 'submit' : 'button')
-      alert(fileInput.getAttribute('type'))
       const [label] = fileInput.children
-      label.setAttribute('for', target.value ? '' : 'fileInput')
+      label.setAttribute('for', target.value ? 'urlInput' : 'fileInput')
       label.innerText = target.value ? 'Submit' : 'Upload'
     })
     let isFocus, isPointerover
