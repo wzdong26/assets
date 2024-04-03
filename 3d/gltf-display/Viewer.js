@@ -62,7 +62,17 @@ export class Viewer {
     this._mixer && this._mixer.update(delta)
     this.renderer.render(this.scene, this.camera)
     this._prevRenderTime = time
+    this._renderedCb?.()
   })
+  /** @private @type {() => void} */
+  _renderedCb
+  /** @param {() => void} cb*/
+  onRendered(cb) {
+    this._renderedCb = cb
+    return () => {
+      this._renderedCb = null
+    }
+  }
   /**@private */
   _resizeToDisplaySize() {
     const { width, clientWidth, height, clientHeight } = this.canvas

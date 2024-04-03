@@ -8,13 +8,30 @@ const gui = new dat.GUI()
 {
   const basicFolder = gui.addFolder('Basic')
   basicFolder.add({
-    HOME() {
+    Home() {
       form.hidden = !form.hidden
     }
-  }, 'HOME')
+  }, 'Home')
+  const saveBlob = (function () {
+    const a = document.createElement('a')
+    document.body.appendChild(a)
+    a.style.display = 'none'
+    return function saveData(blob, fileName) {
+      const url = URL.createObjectURL(blob)
+      a.href = url
+      a.download = fileName
+      a.click()
+    }
+  }())
   basicFolder.add({
     saveImg() {
-      console.log('saveImg')
+      const cleanup = viewer.onRendered(() => {
+        canvas.toBlob((blob) => {
+          saveBlob(blob, `screencapture-${canvas.width}x${canvas.height}.png`)
+        })
+        cleanup()
+      })
+      viewer.render()
     }
   }, 'saveImg')
 }
@@ -85,17 +102,9 @@ function addAnimationsGUI(animations) {
   })
 }
 
-const canvas = document.createElement('canvas')
 const form = document.querySelector('form')
-const demoList = document.querySelector('.demo-list')
-demoList.addEventListener('click', ({ target }) => {
-  form[2].value = target.innerText
-  form[2].scrollBy({ left: 999 })
-})
-// form[2].addEventListener('change', ({ target }) => {
-//   console.log(target,form[0],form[0].type)
-//   form[0].type = target.value ? 'submit' : 'button'
-// })
+const [fileInput, urlInput] = form
+const canvas = document.createElement('canvas')
 
 const viewer = new Viewer({ renderer: { canvas } })
 document.body.appendChild(canvas)
@@ -128,9 +137,48 @@ const setLoading = (function createIframeLoading() {
   }
 })()
 
-// ================== gltf input ===================
+  // ================== gltf input ===================
+  ; (function onUrlInput() {
+    const urlDemo = document.querySelector('.url-recommend')
+    const inputEvent = new Event('input', { bubbles: true })
+    urlDemo.addEventListener('click', ({ target }) => {
+      if (target.tagName === 'LI') {
+        urlInput.value = target.innerText
+        urlInput.dispatchEvent(inputEvent)
+        urlInput.scrollBy({ left: 999 })
+      }
+    })
+    urlInput.addEventListener('input', ({ target }) => {
+      fileInput.type = target.value ? 'submit' : 'button'
+      const [label] = fileInput.children
+      label.setAttribute('for', target.value ? '' : 'fileInput')
+      label.innerText = target.value ? 'Submit' : 'Upload'
+    })
+    let isFocus, isPointerover
+    urlInput.addEventListener('focus', () => {
+      urlDemo.hidden = false
+      isFocus = true
+      isPointerover = true
+    })
+    urlInput.addEventListener('blur', () => {
+      if (!isPointerover) {
+        urlDemo.hidden = true
+      }
+      isFocus = false
+    })
+    urlDemo.addEventListener('pointermove', () => {
+      isPointerover = true
+    })
+    urlDemo.addEventListener('pointerleave', (evt) => {
+      if (evt.pointerType !== 'mouse') return
+      if (!isFocus) {
+        urlDemo.hidden = true
+      }
+      isPointerover = false
+    })
+  })()
+
 function onUploadGLTF(onLoad, onError) {
-  const fileInput = form.querySelector('input[type=file]')
   fileInput.addEventListener('change', ({ target }) => {
     const { files } = target
     for (const file of files) {
@@ -142,7 +190,7 @@ function onUploadGLTF(onLoad, onError) {
     onError?.('Not gltf')
   })
   form.addEventListener('submit', (e) => {
-    const url = e.target[2].value
+    const url = urlInput.value
     onLoad?.(url)
   })
 }
