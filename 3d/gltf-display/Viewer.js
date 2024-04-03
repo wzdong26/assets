@@ -223,10 +223,6 @@ export class Viewer {
       action?.reset().play()
     }
   }
-  gltfAnimateCleanup() {
-    this._lastAction?.fadeOut(dur)
-    clearInterval(this._animateTimer)
-  }
 }
 
 /**
