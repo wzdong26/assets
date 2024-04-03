@@ -181,11 +181,13 @@ export class Viewer {
     this._boxHelper = new BoxHelper(this.gltf?.scene, color)
     this.scene.add(this._boxHelper)
     const dispose = this._boxHelper.dispose.bind(this._boxHelper)
+    this.render()
     return Object.assign(this._boxHelper, {
       dispose: () => {
         this.scene.remove(this._boxHelper)
         dispose()
         this._boxHelper = null
+        this.render()
       }
     })
   }
