@@ -41,7 +41,7 @@ const { viewer, conf } = configurator
       if (!modelUrl) return
       let search = `model=${encodeURIComponent(modelUrl)}&`
       const { model, animations, bgColor, bgOpacity, lightColor, lightIntensity, ...newConf } = conf
-      search += `animations=${encodeURIComponent(animations.join(','))}&`
+      search += animations ? `animations=${encodeURIComponent(animations.join(','))}&` : ''
       search += `bgColor=${encodeURIComponent(bgColor) + ',' + encodeURIComponent(bgOpacity)}&`
       search += `light=${encodeURIComponent(lightColor) + ',' + encodeURIComponent(lightIntensity)}&`
       Object.entries(newConf).forEach(([k, v]) => {
@@ -184,7 +184,7 @@ function onUploadGLTF(onLoad, onError) {
     for (const file of files) {
       if (file.name.match(/\.gl(b|tf)$/)) {
         modelUrl = URL.createObjectURL(file)
-        onLoad?.(modelUrl)
+        onLoad?.(file.name, { [file.name]: file })
         return
       }
     }

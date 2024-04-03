@@ -207,25 +207,25 @@ export class Viewer {
       destroy: () => {
         clearInterval(animationFrame)
         this._mixer.stopAllAction()
-        this._animationNames.clear()
+        this._animationNames = null
         this._mixer.uncacheRoot(this._mixer.getRoot())
         this._mixer = null
       }
     })
   }
-  _animationNames = []
+  _animationNames
   /**
    * @param {string[]} names 
    */
   gltfAnimate(names) {
     let cleanupNames
     if (names) {
-      cleanupNames = this._animationNames.filter(e => !names.includes(e))
+      cleanupNames = this._animationNames?.filter(e => !names.includes(e))
       this._animationNames = [...names]
     } else {
       names = this._animationNames
     }
-    if (!this.gltf) return false
+    if (!this.gltf || !names) return false
     const { animations } = this.gltf
     for (const clip of animations) {
       if (names.includes(clip.name)) {
