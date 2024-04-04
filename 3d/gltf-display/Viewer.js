@@ -213,26 +213,30 @@ export class Viewer {
       }
     })
   }
+  /** @private @type {string[]} */
   _animationNames
-  /**
-   * @param {string[]} names 
-   */
+  /** @param {string[]} names */
   gltfAnimate(names) {
-    let cleanupNames
+    const animationsMap = {}
     if (names) {
-      cleanupNames = this._animationNames?.filter(e => !names.includes(e))
+      this._animationNames?.forEach(e => {
+        animationsMap[e] = false
+      })
       this._animationNames = [...names]
     } else {
       names = this._animationNames
     }
     if (!this.gltf || !names) return false
+    ;names.forEach(e => {
+      animationsMap[e] = true
+    })
     const { animations } = this.gltf
     for (const clip of animations) {
-      if (names.includes(clip.name)) {
+      if (animationsMap[clip.name]) {
         const action = this.mixer()?.clipAction(clip)
         action?.reset().play()
       }
-      if (cleanupNames?.includes(clip.name)) {
+      if (animationsMap[clip.name] === false) {
         this.mixer()?.uncacheAction(clip)
       }
     }

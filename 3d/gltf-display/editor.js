@@ -7,13 +7,13 @@ const gui = new dat.GUI()
 const configurator = new ViewerConfigurator(true)
 const { viewer, conf } = configurator
 
-{
+const { addScreenCaptureItem, addShareItem } = (function addBasicFolder() {
   const basicFolder = gui.addFolder('Basic')
   basicFolder.add({
-    Home() {
+    home() {
       form.hidden = !form.hidden
     }
-  }, 'Home')
+  }, 'home')
   const saveBlob = (function () {
     const a = document.createElement('a')
     document.body.appendChild(a)
@@ -25,33 +25,44 @@ const { viewer, conf } = configurator
       a.click()
     }
   }())
-  basicFolder.add({
-    saveImg() {
-      const cleanup = viewer.onRendered(() => {
-        canvas.toBlob((blob) => {
-          saveBlob(blob, `screencapture-${canvas.width}x${canvas.height}.png`)
-        })
-        cleanup()
-      })
-      viewer.render()
+
+  let screenCaptureItem, shareItem
+  return {
+    addScreenCaptureItem() {
+      screenCaptureItem && basicFolder.remove(screenCaptureItem)
+      screenCaptureItem = basicFolder.add({
+        screenCapture() {
+          const cleanup = viewer.onRendered(() => {
+            const { canvas } = viewer
+            canvas.toBlob((blob) => {
+              saveBlob(blob, `screencapture-${canvas.width}x${canvas.height}.png`)
+            })
+            cleanup()
+          })
+          viewer.render()
+        }
+      }, 'screenCapture')
+    },
+    addShareItem(modelUrl) {
+      shareItem && basicFolder.remove(shareItem)
+      shareItem = modelUrl && basicFolder.add({
+        share() {
+          if (!modelUrl) return
+          let search = `model=${encodeURIComponent(modelUrl)}&`
+          const { model, animations, bgColor, bgOpacity, lightColor, lightIntensity, ...newConf } = conf
+          search += animations ? `animations=${encodeURIComponent(animations.join(','))}&` : ''
+          search += `bgColor=${encodeURIComponent(bgColor) + ',' + encodeURIComponent(bgOpacity)}&`
+          search += `light=${encodeURIComponent(lightColor) + ',' + encodeURIComponent(lightIntensity)}&`
+          Object.entries(newConf).forEach(([k, v]) => {
+            if (!v) return
+            search += `${k}=${encodeURIComponent(v)}&`
+          })
+          window.open(new URL(`./?${search}`, location.href))
+        }
+      }, 'share')
     }
-  }, 'saveImg')
-  basicFolder.add({
-    share() {
-      if (!modelUrl) return
-      let search = `model=${encodeURIComponent(modelUrl)}&`
-      const { model, animations, bgColor, bgOpacity, lightColor, lightIntensity, ...newConf } = conf
-      search += animations ? `animations=${encodeURIComponent(animations.join(','))}&` : ''
-      search += `bgColor=${encodeURIComponent(bgColor) + ',' + encodeURIComponent(bgOpacity)}&`
-      search += `light=${encodeURIComponent(lightColor) + ',' + encodeURIComponent(lightIntensity)}&`
-      Object.entries(newConf).forEach(([k, v]) => {
-        if (!v) return
-        search += `${k}=${encodeURIComponent(v)}&`
-      })
-      window.open(new URL(`./?${search}`, location.href))
-    }
-  }, 'share')
-}
+  }
+})()
 
 {
   const sceneFolder = gui.addFolder('Scene')
@@ -110,6 +121,7 @@ const [fileInput, urlInput] = form
 const loadGLTF = (...p) => {
   setLoading(true)
   viewer.loadGLTF(...p).then(({ animations }) => {
+    addScreenCaptureItem()
     addAnimationsGUI(animations)
     form.hidden = true
   }, (e) => {
@@ -176,14 +188,12 @@ const setLoading = (function createIframeLoading() {
     })
   })()
 
-let modelUrl;
 function onUploadGLTF(onLoad, onError) {
   const fileInputOrigin = document.getElementById('fileInput')
   fileInputOrigin.addEventListener('change', ({ target }) => {
     const { files } = target
     for (const file of files) {
       if (file.name.match(/\.gl(b|tf)$/)) {
-        modelUrl = URL.createObjectURL(file)
         onLoad?.(file.name, { [file.name]: file })
         return
       }
@@ -191,8 +201,8 @@ function onUploadGLTF(onLoad, onError) {
     onError?.('Not gltf')
   })
   form.addEventListener('submit', (e) => {
-    modelUrl = urlInput.value
-    onLoad?.(modelUrl)
+    addShareItem(urlInput.value)
+    onLoad?.(urlInput.value)
   })
 }
 
