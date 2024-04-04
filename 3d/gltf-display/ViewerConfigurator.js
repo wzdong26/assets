@@ -9,7 +9,7 @@ export class ViewerConfigurator {
     wireFrame: false, boxHelper: false, zoom: 2.0, alpha: 5.0,
     animationSpeed: 1
   }
-  /** @type {IViewerConf} */
+  /** @type {typeof this._conf} */
   conf = {}
   constructor(addDefaultConf) {
     const canvas = document.createElement('canvas')
@@ -73,7 +73,7 @@ export class ViewerConfigurator {
     const propertiesF = Object.fromEntries(Object.entries(p).map(([k, v]) => [k, watchSetFn(v, conf[k])]))
     Object.defineProperties(conf, propertiesF)
   }
-  /** @param {IViewerConf} conf */
+  /** @param {typeof this.conf} conf */
   setConf(conf) {
     Object.assign(this.conf, conf)
   }
