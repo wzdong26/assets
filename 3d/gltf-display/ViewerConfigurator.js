@@ -28,7 +28,7 @@ export class ViewerConfigurator {
         viewer.setBgColor(v, conf.bgOpacity)
       },
       bgOpacity(v) {
-        viewer.setBgColor(conf.bgOpacity, v)
+        viewer.setBgColor(conf.bgColor, v)
       },
       enableCtrl: viewer.enableCtrl.bind(viewer),
       rotate: viewer.autoRotate.bind(viewer),
@@ -53,7 +53,6 @@ export class ViewerConfigurator {
         viewer.gltfAnimate(v)
       },
       animationSpeed(v) {
-        if (!viewer.mixer()) return false
         viewer.mixer().timeScale = v
       }
     }

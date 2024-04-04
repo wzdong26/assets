@@ -47,6 +47,20 @@ export class Viewer {
   light
   /** @type {GLTF} */
   gltf
+  /** @private gltf state */
+  _gltfState = {
+    zoom: 2.0,
+    alpha: 5.0,
+    wireFrame: false,
+    /** @type {BoxHelper} */
+    boxHelper: null,
+    /** @type {AnimationMixer & {destroy: () => void}} */
+    mixer: null,
+    /** @type {string[]} */
+    animations: null,
+    /** @type {number} */
+    animTimeScale: undefined,
+  }
 
   /** @param {{camera: PerspectiveCameraOptions; renderer: WebGLRendererParameters}} */
   constructor({ camera: { fov, near, far } = {}, renderer = {} } = {}) {
@@ -61,26 +75,12 @@ export class Viewer {
     this.scene.add(this.light)
     GLTF_LOADER.ktx2LoaderDetectSupport(this.renderer)
   }
-  /** @private @type {number} */
-  _prevRenderTime
-  render = rafDebounce((time) => {
-    const delta = (time - this._prevRenderTime) / 1000
+  render = rafDebounce(({ delta }, ...args) => {
     this._resizeToDisplaySize()
     this.controls.update()
-    this._mixer && this._mixer.update(delta)
+    this._gltfState.mixer && this._gltfState.mixer.update(delta / 1000)
     this.renderer.render(this.scene, this.camera)
-    this._prevRenderTime = time
-    this._renderedCb?.()
   })
-  /** @private @type {() => void} */
-  _renderedCb
-  /** @param {() => void} cb*/
-  onRendered(cb) {
-    this._renderedCb = cb
-    return () => {
-      this._renderedCb = null
-    }
-  }
   /**@private */
   _resizeToDisplaySize() {
     const { width, clientWidth, height, clientHeight } = this.canvas
@@ -127,29 +127,29 @@ export class Viewer {
     this.scene.add(this.gltf.scene)
 
     this.gltfAlignCenter()
-    this._wireFrame && this.gltfWireFrame(this._wireFrame)
-    this._boxHelper?.setFromObject(this.gltf.scene)
+    const { wireFrame, boxHelper } = this._gltfState
+    wireFrame && this.gltfWireFrame(wireFrame)
+    boxHelper?.setFromObject(this.gltf.scene)
     this.gltfAnimate()
 
     this.render()
     return this.gltf
   }
   unloadGLTF() {
-    this.mixer()?.destroy()
+    this.mixer().destroy?.()
     const { gltf } = this
     gltf && this.scene.remove(gltf.scene)
     this.gltf = null
     this.render()
     return !gltf
   }
-  /** @typedef {{zoom: number; alpha: number}} AlignCenterParams */
-  /** @private @type {AlignCenterParams} */
-  _alignCenterParams = { zoom: 2.0, alpha: 5.0 }
-  /** @param {AlignCenterParams} */
+
+  /** @param {{zoom: number; alpha: number}} */
   gltfAlignCenter({ zoom, alpha } = {}) {
-    if (zoom != null) this._alignCenterParams.zoom = zoom
-    if (alpha != null) this._alignCenterParams.alpha = alpha
-    const { zoom: _zoom, alpha: _alpha } = this._alignCenterParams
+    const { _gltfState } = this
+    if (zoom != null) _gltfState.zoom = zoom
+    if (alpha != null) _gltfState.alpha = alpha
+    const { zoom: _zoom, alpha: _alpha } = _gltfState
     if (!this.gltf) return false
     const model = this.gltf.scene
     model.updateMatrixWorld() // important! 更新模型的世界矩阵
@@ -168,11 +168,9 @@ export class Viewer {
     this.controls.target = center
     this.render()
   }
-  /** @private @type {boolean} */
-  _wireFrame
   /** @param {boolean} wireframe */
   gltfWireFrame(wireframe) {
-    this._wireFrame = wireframe
+    this._gltfState.wireFrame = wireframe
     if (!this.gltf) return false
     const model = this.gltf.scene
     model.traverse((node) => {
@@ -184,55 +182,65 @@ export class Viewer {
     })
     this.render()
   }
-  /** @private @type {BoxHelper} */
-  _boxHelper
   /** @param {ColorRepresentation} color */
   gltfBoxHelper(color) {
-    if (color == null && this._boxHelper) return this._boxHelper
-    this._boxHelper = new BoxHelper(this.gltf?.scene, color)
-    this.scene.add(this._boxHelper)
-    const dispose = this._boxHelper.dispose.bind(this._boxHelper)
+    const { boxHelper } = this._gltfState
+    if (color == null && boxHelper) return boxHelper
+    const box = new BoxHelper(this.gltf?.scene, color)
+    this._gltfState.boxHelper = box
+    this.scene.add(box)
+    const dispose = box.dispose.bind(box)
     this.render()
-    return Object.assign(this._boxHelper, {
+    return Object.assign(box, {
       dispose: () => {
-        this.scene.remove(this._boxHelper)
+        this.scene.remove(box)
         dispose()
-        this._boxHelper = null
+        this._gltfState.boxHelper = box = null
         this.render()
       }
     })
   }
-  /** @private @type {AnimationMixer & {destroy: () => void}} */
-  _mixer
   mixer() {
-    if (this._mixer) return this._mixer
-    if (!this.gltf) return
+    const { mixer, animTimeScale } = this._gltfState
+    if (mixer) return mixer
+    const nullRst = Object.defineProperties({ timeScale: animTimeScale }, {
+      timeScale: {
+        set: (v) => {
+          this._gltfState.animTimeScale = v
+          return v
+        }
+      }
+    })
+    if (!this.gltf) return nullRst
     const { animations, scene } = this.gltf
-    if (!animations?.length) return
-    this._mixer = new AnimationMixer(scene)
-    const animationFrame = setInterval(this.render.bind(this))
-    return Object.assign(this._mixer, {
+    if (!animations?.length) return nullRst
+    const mMixer = new AnimationMixer(scene)
+    this._gltfState.mixer = mMixer
+    if (animTimeScale) {
+      mMixer.timeScale = animTimeScale
+    }
+    const timer = setInterval(this.render.bind(this))
+    return Object.assign(mMixer, {
       destroy: () => {
-        clearInterval(animationFrame)
-        this._mixer.stopAllAction()
-        this._animationNames = null
-        this._mixer.uncacheRoot(this._mixer.getRoot())
-        this._mixer = null
+        clearInterval(timer)
+        mMixer.stopAllAction()
+        this._gltfState.animations = null
+        mMixer.uncacheRoot(mMixer.getRoot())
+        this._gltfState.mixer = mMixer = null
+        this._gltfState.animTimeScale = undefined
       }
     })
   }
-  /** @private @type {string[]} */
-  _animationNames
   /** @param {string[]} names */
   gltfAnimate(names) {
     const animationsMap = {}
     if (names) {
-      this._animationNames?.forEach(e => {
+      this._gltfState.animations?.forEach(e => {
         animationsMap[e] = false
       })
-      this._animationNames = [...names]
+      this._gltfState.animations = [...names]
     } else {
-      names = this._animationNames
+      names = this._gltfState.animations
     }
     if (!this.gltf || !names) return false
       ; names.forEach(e => {
@@ -241,11 +249,11 @@ export class Viewer {
     const { animations } = this.gltf
     for (const clip of animations) {
       if (animationsMap[clip.name]) {
-        const action = this.mixer()?.clipAction(clip)
+        const action = this.mixer().clipAction?.(clip)
         action?.reset().play()
       }
       if (animationsMap[clip.name] === false) {
-        this.mixer()?.uncacheAction(clip)
+        this.mixer().uncacheAction?.(clip)
       }
     }
   }
@@ -311,18 +319,22 @@ function initGLTFLoader({
 
 /**
  * requestAnimationFrame debounce: 在一个动画帧内的频繁事件仅在下一次重绘前执行一次
- * @param {(time: number) => void} cb 触发事件执行的回调
- * @returns 防抖后的回调
+ * @type {<T extends any[], R>(cb: (t: {time: number; delta: number}, ...args: T) => R) => (...args: T) => Promise<R>}
  */
 function rafDebounce(cb) {
-  let flag = false
-  return function () {
-    if (!flag) {
-      flag = true
+  let pending
+  let prevTime = 0
+  return function (...args) {
+    if (pending) return pending
+    return (pending = new Promise((resolve, reject) =>
       requestAnimationFrame((time) => {
-        flag = false
-        cb?.(time)
+        pending = null
+        const delta = time - prevTime
+        resolve(
+          cb?.call(this, { time, delta }, ...args)
+        )
+        prevTime = time
       })
-    }
+    ))
   }
 }

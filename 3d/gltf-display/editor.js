@@ -40,15 +40,12 @@ const { addScreenCaptureItem, addShareItem } = (function addBasicFolder() {
     addScreenCaptureItem() {
       screenCaptureItem && basicFolder.remove(screenCaptureItem)
       screenCaptureItem = basicFolder.add({
-        screenCapture() {
-          const cleanup = viewer.onRendered(() => {
-            const { canvas } = viewer
-            canvas.toBlob((blob) => {
-              saveBlob(blob, `screencapture-${canvas.width}x${canvas.height}.png`)
-            })
-            cleanup()
+        async screenCapture() {
+          await viewer.render()
+          const { canvas } = viewer
+          canvas.toBlob((blob) => {
+            saveBlob(blob, `screencapture-${canvas.width}x${canvas.height}.png`)
           })
-          viewer.render()
         }
       }, 'screenCapture')
     },
