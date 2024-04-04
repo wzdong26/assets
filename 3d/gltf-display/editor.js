@@ -158,13 +158,16 @@ onDragDropGLTF(loadGLTF, console.error)
       setLoading(true)
       progress.removeAttribute('value')
     })
-    onGLTFLoad('onProgress', (url, loaded, total) => {
-      progress.value = (loaded - startCount) / (total - startCount)
-    })
     let _total
+    // 加载loading
     onGLTFLoad('onLoading', (evt) => {
       const { loaded, total = _total, lengthComputable } = evt
-      progress.value = loaded / total
+      progress.value = Math.min(loaded / total, 1) * 0.7
+      _total = total
+    })
+    // 渲染loading
+    onGLTFLoad('onProgress', (url, loaded, total) => {
+      progress.value = (loaded - startCount) / (total - startCount) * 0.3 + 0.7
     })
       ;['onLoad', 'onError'].map(e => onGLTFLoad(e, () => setLoading(false)))
 
