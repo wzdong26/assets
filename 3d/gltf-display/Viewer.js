@@ -195,7 +195,7 @@ export class Viewer {
       dispose: () => {
         this.scene.remove(box)
         dispose()
-        this._gltfState.boxHelper = box = null
+        this._gltfState.boxHelper = null
         this.render()
       }
     })
@@ -226,7 +226,7 @@ export class Viewer {
         mMixer.stopAllAction()
         this._gltfState.animations = null
         mMixer.uncacheRoot(mMixer.getRoot())
-        this._gltfState.mixer = mMixer = null
+        this._gltfState.mixer = null
         this._gltfState.animTimeScale = undefined
       }
     })
