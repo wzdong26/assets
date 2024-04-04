@@ -97,10 +97,10 @@ const { addScreenCaptureItem, addShareItem } = (function addBasicFolder() {
 
 let animationsFolder
 function addAnimationsGUI(animations) {
-  if (!animations?.length) return
   try {
     gui.removeFolder(animationsFolder)
   } catch { }
+  if (!animations?.length) return
   animationsFolder = gui.addFolder('Animations')
   animationsFolder.add(conf, 'animationSpeed', 0, 2)
     ; animations.forEach(({ name }, idx) => {
