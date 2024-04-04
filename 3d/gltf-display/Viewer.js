@@ -26,6 +26,14 @@ import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.j
 
 const GLTF_LOADER = initGLTFLoader()
 
+/**
+ * @type {<T extends 'onProgress' | 'onStart' | 'onError' | 'onLoad' | 'onLoading'>(evtName: T, fn: typeof GLTF_LOADER[T]) => () => void}
+ */
+export const onGLTFLoad = (evtName, fn) => {
+  GLTF_LOADER[evtName] = fn
+  return () => { GLTF_LOADER.onProgress = null }
+}
+
 export class Viewer {
   /** @property {Scene} */
   scene
@@ -227,9 +235,9 @@ export class Viewer {
       names = this._animationNames
     }
     if (!this.gltf || !names) return false
-    ;names.forEach(e => {
-      animationsMap[e] = true
-    })
+      ; names.forEach(e => {
+        animationsMap[e] = true
+      })
     const { animations } = this.gltf
     for (const clip of animations) {
       if (animationsMap[clip.name]) {
@@ -268,13 +276,16 @@ function initGLTFLoader({
     .setDRACOLoader(dracoLoader)
     .setKTX2Loader(ktx2Loader)
     .setMeshoptDecoder(MeshoptDecoder)
+  /**@param {ProgressEvent<EventTarget>} evt */
+  function onLoading(evt) { }
+  const mm = Object.assign(manager, { onLoading })
   return Object.assign(manager, {
     ktx2LoaderDetectSupport,
     /**
      * @param {string} gltfUrl 
      * @param {Record<string, Blob>} blobs 
      */
-    async load(gltfUrl, blobs) {
+    load(gltfUrl, blobs) {
       const objectURLs = []
       manager.setURLModifier((url) => {
         const blob = blobs?.[url]
@@ -284,9 +295,16 @@ function initGLTFLoader({
         objectURLs.push(url)
         return url
       })
-      const gltf = await loader.loadAsync(gltfUrl)
-      objectURLs.forEach((url) => URL.revokeObjectURL(url))
-      return gltf
+      const cleanup = () => objectURLs.forEach((url) => URL.revokeObjectURL(url))
+      return new Promise((resolve, reject) => {
+        loader.load(gltfUrl, (data) => {
+          resolve(data)
+          cleanup()
+        }, (e) => mm.onLoading?.(e), (err) => {
+          reject(err)
+          cleanup()
+        })
+      })
     }
   })
 }

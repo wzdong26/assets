@@ -1,11 +1,20 @@
 
+import { onGLTFLoad } from './Viewer.js'
 import { ViewerConfigurator } from './ViewerConfigurator.js'
 import { parseDataTransferItems } from './readFiles.js'
 
+const form = document.querySelector('form')
+const [fileInput, urlInput] = form
+
 const gui = new dat.GUI()
+gui.close()
 
 const configurator = new ViewerConfigurator(true)
 const { viewer, conf } = configurator
+
+  ;[form, viewer.canvas].map(e =>
+    e.addEventListener('touchend', gui.close.bind(gui))
+  )
 
 const { addScreenCaptureItem, addShareItem } = (function addBasicFolder() {
   const basicFolder = gui.addFolder('Basic')
@@ -115,11 +124,7 @@ function addAnimationsGUI(animations) {
     })
 }
 
-const form = document.querySelector('form')
-const [fileInput, urlInput] = form
-
 const loadGLTF = (...p) => {
-  setLoading(true)
   viewer.loadGLTF(...p).then(({ animations }) => {
     addScreenCaptureItem()
     addAnimationsGUI(animations)
@@ -127,25 +132,47 @@ const loadGLTF = (...p) => {
   }, (e) => {
     console.error('Load glTF error:', e)
     form.hidden = false
-  }).finally(() => {
-    setLoading(false)
   })
 }
 
 onUploadGLTF(loadGLTF, console.error)
 onDragDropGLTF(loadGLTF, console.error)
 
-// =================== loading ===================
-const setLoading = (function createIframeLoading() {
-  const iframeT = document.createElement('iframe')
-  iframeT.src = './?model=./loading/scene.gltf&rotate=30&bgColor=e0dfdf,0.85&zoom=0.35'
-  iframeT.className = 'loading'
-  iframeT.hidden = true
-  document.body.appendChild(iframeT)
-  return function setLoading(flag) {
-    iframeT.hidden = !flag
-  }
-})()
+  // =================== loading ===================
+  ; (function createLoading() {
+    const loadingT = document.querySelector('.loading')
+
+    const iframe = document.createElement('iframe')
+    iframe.src = './?model=./loading/scene.gltf&rotate=30&bgColor=e0dfdf,0.85&zoom=0.35'
+    loadingT.appendChild(iframe)
+
+    const progress = document.createElement('progress')
+    progress.max = 1
+    loadingT.appendChild(progress)
+
+    setLoading(false)
+
+    let startCount
+    onGLTFLoad('onStart', (url, loaded, total) => {
+      startCount = total
+      setLoading(true)
+      progress.removeAttribute('value')
+    })
+    onGLTFLoad('onProgress', (url, loaded, total) => {
+      progress.value = (loaded - startCount) / (total - startCount)
+    })
+    let _total
+    onGLTFLoad('onLoading', (evt) => {
+      const { loaded, total = _total, lengthComputable } = evt
+      progress.value = loaded / total
+    })
+      ;['onLoad', 'onError'].map(e => onGLTFLoad(e, () => setLoading(false)))
+
+    function setLoading(flag) {
+      loadingT.hidden = !flag
+      progress.value = +!flag
+    }
+  })()
 
   // ================== gltf input ===================
   ; (function onUrlInput() {
@@ -163,28 +190,25 @@ const setLoading = (function createIframeLoading() {
       const [label] = fileInput.children
       label.setAttribute('for', target.value ? '' : 'fileInput')
       label.innerHTML = target.value ? '<output>Submit</output>' : 'Upload'
+      urlDemo.hidden = !!target.value
+      urlDemo.hidden && (isPointerover = false)
     })
-    let isFocus, isPointerover
-    urlInput.addEventListener('focus', () => {
-      urlDemo.hidden = false
-      isFocus = true
-      isPointerover = true
+    urlInput.addEventListener('focus', ({ target }) => {
+      if (!target.value) {
+        urlDemo.hidden = false
+      }
     })
     urlInput.addEventListener('blur', () => {
       if (!isPointerover) {
         urlDemo.hidden = true
       }
-      isFocus = false
     })
-    urlDemo.addEventListener('pointermove', () => {
+    let isPointerover
+    urlDemo.addEventListener('pointerenter', () => {
       isPointerover = true
     })
     urlDemo.addEventListener('pointerleave', (evt) => {
-      if (evt.pointerType !== 'mouse') return
-      if (!isFocus) {
-        urlDemo.hidden = true
-      }
-      isPointerover = false
+      isPointerover = evt.pointerType !== 'mouse'
     })
   })()
 

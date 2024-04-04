@@ -13,7 +13,10 @@ function getSearchParams() {
   const { searchParams } = new URL(href)
   const searchP = Object.fromEntries(searchParams.entries())
 
-  if (!searchP.model) return {}
+  if (!searchP.model) {
+    alert('未指定glTF，请在url query串中添加model参数！')
+    return {}
+  }
 
   searchP.model = [searchP.model]
   searchP.enableCtrl = searchP.enableCtrl != null

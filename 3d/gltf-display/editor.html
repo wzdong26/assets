@@ -24,10 +24,9 @@
 			height: 100%;
 			display: flex;
 			flex-direction: column;
-			justify-content: center;
 			align-items: center;
 			gap: 30px;
-			background-color: rgba(255, 255, 255, 0.5);
+			background-color: rgba(255, 255, 255, .5);
 			backdrop-filter: blur(5px);
 
 			&[hidden] {
@@ -36,6 +35,7 @@
 
 			>.file-input {
 				width: min(22rem, 90vw);
+				margin-top: 30vh;
 				padding: 0;
 				border: 0;
 				background-color: #000000d8;
@@ -60,17 +60,27 @@
 
 				>input {
 					width: 100%;
-					background-color: rgba(253, 253, 253, 0.1);
-					padding: 0.8rem 1rem;
+					background-color: rgba(253, 253, 253, .1);
+					padding: .8rem 1rem;
 					font-size: 1.6rem;
 					text-align: center;
 					border-radius: .5rem;
 					border: 1px solid;
+
+					&::-webkit-search-cancel-button {
+						-webkit-appearance: none;
+						margin: 0 -.5rem 0 .2rem;
+						height: 1.5rem;
+						width: 1.5rem;
+						background: url(https://www.svgrepo.com/show/496058/close-square.svg);
+						background-size: contain;
+						cursor: pointer;
+					}
 				}
 
 				>.url-recommend {
 					overflow-wrap: break-word;
-					background-color: rgba(253, 253, 253, 0.5);
+					background-color: rgba(253, 253, 253, .5);
 					color: #393939;
 					border: 1px solid;
 					box-sizing: border-box;
@@ -102,7 +112,7 @@
 
 		.dragging-hover::after {
 			content: '拖拽glTF文件放置此处（支持.gltf/.glb）';
-			background-color: rgba(23, 24, 23, 0.5);
+			background-color: rgba(23, 24, 23, .5);
 			color: #fff;
 			position: absolute;
 			z-index: 1;
@@ -119,13 +129,24 @@
 		}
 
 		.loading {
-			position: absolute;
+			position: fixed;
 			z-index: 2;
 			top: 0;
 			width: 100%;
 			height: 100%;
-			box-sizing: border-box;
-			border: 0;
+
+			>iframe {
+				border: 0;
+				width: 100%;
+				height: 100%;
+			}
+
+			>progress {
+				position: absolute;
+				top: 60%;
+				left: 50%;
+				transform: translate(-50%, -50%);
+			}
 		}
 	</style>
 </head>
@@ -147,9 +168,9 @@
 				</ul>
 			</div>
 		</div>
-
 		<input id="fileInput" hidden type="file" accept=".gltf,.glb" placeholder="Upload glTF(.glb/.gltf)" />
 	</form>
+	<div class="loading" hidden></div>
 </body>
 <script type="importmap">
 {
