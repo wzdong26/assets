@@ -49,8 +49,8 @@ export class Viewer {
   gltf
   /** @private gltf state */
   _gltfState = {
-    zoom: 2.0,
-    alpha: 5.0,
+    zoom: 0.5,
+    alpha: 0.2,
     wireFrame: false,
     /** @type {BoxHelper} */
     boxHelper: null,
@@ -161,9 +161,9 @@ export class Viewer {
     this.camera.near = size / 100
     this.camera.far = size * 100
     this.camera.position.copy(center)
-    this.camera.position.x += size / (zoom ?? _zoom)
-    this.camera.position.y += size / (alpha ?? _alpha)
-    this.camera.position.z += size / (zoom ?? _zoom)
+    this.camera.position.x += size * (zoom ?? _zoom)
+    this.camera.position.y += size * (alpha ?? _alpha)
+    this.camera.position.z += size * (zoom ?? _zoom)
     this.camera.updateProjectionMatrix() // important! 更新相机的投影矩阵
     this.controls.target = center
     this.render()

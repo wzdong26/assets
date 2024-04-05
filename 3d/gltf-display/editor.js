@@ -88,8 +88,8 @@ const { addScreenCaptureItem, addShareItem } = (function addBasicFolder() {
   const modelFolder = gui.addFolder('Model')
   modelFolder.add(conf, 'wireFrame')
   modelFolder.add(conf, 'boxHelper')
-  modelFolder.add(conf, 'zoom', 0.1, 10)
-  modelFolder.add(conf, 'alpha', 1, 7)
+  modelFolder.add(conf, 'zoom', 0, 2)
+  modelFolder.add(conf, 'alpha', 0, 2)
 }
 
 let animationsFolder
@@ -139,13 +139,8 @@ onDragDropGLTF(loadGLTF, console.error)
   ; (function createLoading() {
     const loadingT = document.querySelector('.loading')
 
-    const iframe = document.createElement('iframe')
-    iframe.src = './?model=./loading/scene.gltf&rotate=30&bgColor=e0dfdf,0.85&zoom=0.35'
-    loadingT.appendChild(iframe)
-
-    const progress = document.createElement('progress')
-    progress.max = 1
-    loadingT.appendChild(progress)
+    const progress = loadingT.querySelector('.progress')
+    document.createElement('div')
 
     setLoading(false)
 
@@ -153,24 +148,24 @@ onDragDropGLTF(loadGLTF, console.error)
     onGLTFLoad('onStart', (url, loaded, total) => {
       startCount = total
       setLoading(true)
-      progress.removeAttribute('value')
     })
     let _total
     // 加载loading
     onGLTFLoad('onLoading', (evt) => {
       const { loaded, total = _total, lengthComputable } = evt
-      progress.value = Math.min(loaded / total, 1) * 0.7
+      progress.style.setProperty('--progress', Math.min((loaded / total).toFixed(3), 1) * 0.7)
       _total = total
     })
     // 渲染loading
     onGLTFLoad('onProgress', (url, loaded, total) => {
-      progress.value = (loaded - startCount) / (total - startCount) * 0.3 + 0.7
+      const v = ((loaded - startCount) / (total - startCount)).toFixed(3) * 0.3 + 0.7
+      progress.style.setProperty('--progress', v)
     })
       ;['onLoad', 'onError'].map(e => onGLTFLoad(e, () => setLoading(false)))
 
     function setLoading(flag) {
       loadingT.hidden = !flag
-      progress.value = +!flag
+      progress.style.setProperty('--progress', +!flag)
     }
   })()
 

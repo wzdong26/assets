@@ -6,7 +6,7 @@ export class ViewerConfigurator {
   _conf = {
     bgColor: '#ffffff', bgOpacity: 1, enableCtrl: true, rotate: 0,
     lightColor: '#ffffff', lightIntensity: 1,
-    wireFrame: false, boxHelper: false, zoom: 2.0, alpha: 5.0,
+    wireFrame: false, boxHelper: false, zoom: 0.5, alpha: 0.2,
     animationSpeed: 1
   }
   /** @type {typeof this._conf} */
